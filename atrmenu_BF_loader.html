@@ -1,0 +1,494 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ATRmenu – build a bootable Atari 8-bit menu disk</title>
+<style>
+:root{--bg:#14161c;--pn:#1e222b;--bd:#343a48;--fg:#e8e6df;--ac:#f0a030;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.4 system-ui,sans-serif}
+header{padding:12px 16px;border-bottom:1px solid var(--bd);display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+h1{margin:0;font-size:18px;color:var(--ac)}
+.brand{margin-left:auto;font-size:12px;color:#9aa;white-space:nowrap}
+.steps span{padding:4px 10px;border-radius:12px;border:1px solid var(--bd);color:#9aa;margin-right:6px}
+.steps .on{background:var(--ac);color:#111;border-color:var(--ac)}
+main{max-width:900px;margin:0 auto;padding:12px}
+section{background:var(--pn);border:1px solid var(--bd);border-radius:8px;padding:14px;margin-bottom:12px}
+button,select,input{background:#10131a;color:var(--fg);border:1px solid var(--bd);border-radius:5px;padding:6px 9px;font:inherit}
+button{cursor:pointer}button:hover{border-color:var(--ac)}
+button.go{background:var(--ac);color:#111;border-color:var(--ac);font-weight:600}
+#drop{border:2px dashed var(--bd);border-radius:8px;padding:28px;text-align:center;cursor:pointer;color:#9aa}
+#drop.hv{border-color:var(--ac);color:var(--ac)}
+.er{display:flex;gap:6px;margin:6px 0;align-items:center;flex-wrap:nowrap}
+.er input{flex:1;min-width:0}
+.er b{width:28px;flex-shrink:0;color:var(--ac)}
+.er small{flex-shrink:0;color:#9aa}
+#ents .er{gap:8px;width:100%}
+#ents .er input{flex:1 1 auto;min-width:280px}
+#ents .er .fn{flex:0 1 180px;min-width:0;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#9aa}
+#ents .er button{flex-shrink:0;padding:4px 8px;margin:0}
+.bar{height:8px;background:#10131a;border-radius:4px;overflow:hidden;margin:8px 0}
+.bar i{display:block;height:100%;background:var(--ac)}.bar.bad i{background:#e55}
+#pv{box-sizing:border-box;width:min(100%,560px);aspect-ratio:4/3;margin:10px auto 0;color:#f4f4f4;white-space:pre;overflow:hidden;border-radius:4px;font-family:"Courier New","Liberation Mono",monospace}
+#colors{display:flex;gap:20px;flex-wrap:wrap;align-items:center;margin-top:10px}
+#colors label{display:flex;gap:8px;align-items:center;font-size:13px;color:#9aa}
+#colors input[type=range]{width:140px;accent-color:var(--ac)}
+small{color:#9aa}
+#st{color:var(--ac);min-height:20px;margin-top:8px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+</style></head><body>
+<header>
+  <h1>ATRmenu</h1>
+  <div class="steps"><span id="s1" class="on">1 · Files → ATR</span><span id="s2">2 · Disk menu</span></div>
+  <small>100% offline · bootable without DOS · v11</small>
+  <span class="brand">BF loader v1.0, 2026</span>
+</header>
+<main>
+<section id="p1"><div class="row" id="fmtrow" style="margin:0 0 10px"><label>New disk format <select id="fmt"></select></label><small>…or drop an existing .ATR to jump straight to the menu</small></div><div id="ld" hidden style="color:var(--ac);margin-bottom:8px"></div><div id="drop">Drop .XEX / .BIN / .COM files here, or click to choose<br><small>Drop an .ATR image to build a menu for the files already on it</small></div><input type="file" id="fi" multiple hidden>
+<div id="fl"></div><div class="bar" id="bar"><i></i></div><small id="cap"></small>
+<div class="row"><button id="clr">Clear</button><button id="plain">Export ATR without menu</button><button class="go" id="nx" style="margin-left:auto">Next: build menu →</button></div></section>
+<section id="p2" hidden>
+  <div class="row" style="margin:0 0 8px">
+    <input id="title" value="MY DISK MENU" maxlength="36" style="flex:1;min-width:180px" placeholder="Menu title"><label style="display:flex;gap:6px;align-items:center;font-size:13px;color:#9aa">Order <select id="ord"><option value="m">Manual</option><option value="a">Alphabetical A → Z</option><option value="z">Alphabetical Z → A</option></select></label>
+  </div>
+  <div id="ents"></div>
+  <div class="row">
+    <button id="ae">+ Entry</button>
+    <button id="bk">← Back to files</button>
+    <button class="go" id="mk" style="margin-left:auto">Build bootable ATR ↓</button>
+  </div>
+  <div id="pv"></div>
+  <div class="row" id="pgr" hidden style="justify-content:center">
+    <button id="pp">◀ Prev</button>
+    <small id="pg"></small>
+    <button id="pn">Next ▶</button>
+  </div>
+  <div id="colors">
+    <label>Background color <input id="hue" type="range" min="0" max="15" value="9"></label>
+    <label title="On the Atari the text hue follows the background; this sets the text contrast (brightness)">Text contrast <input id="tc" type="range" min="0" max="7" value="7"></label>
+    <label style="margin-left:auto" title="Swap text and background brightness (hue stays the same)"><input type="checkbox" id="inv" style="width:16px;height:16px;padding:0;accent-color:var(--ac)"> Invert colors</label>
+  </div>
+  <small>Keys 1–9, A–Z start the program; with several pages flip with , . (or &lt; &gt;), + −, SPACE or the arrow keys. Disk boots straight into the menu (no DOS needed).</small>
+</section>
+<div id="st"></div></main>
+<script>
+const KEYS='123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ',MAXE=128;
+const FMT={sd:{N:720,SS:128,t:'SD · 90 KB (720 × 128)'},md:{N:1040,SS:128,t:'MD · 130 KB enhanced (1040 × 128)'},dd:{N:720,SS:256,t:'DD · 180 KB (720 × 256)'},qd:{N:1440,SS:256,t:'QD · 360 KB (1440 × 256)'},ds:{N:2880,SS:256,t:'DS/QD · 720 KB (2880 × 256)'}};
+let D=null,G=null,err='';
+// geometry: ed = DOS 2.5 enhanced density (VTOC2 @1024); wide = >1024 sectors, 16-bit sector links (MyDOS style, no file id)
+const gOf=(SS,N)=>{const ed=SS==128&&N>720,wide=!ed&&N>1024,dm=(SS>>4)*8;return{SS,N,ed,wide,top:ed?1024:N,buf:SS==128?0x400:0x500,DB:SS-3,dm,mf:wide?dm:Math.min(64,dm)}};
+const totalSec=g=>g.top-13-(g.ed?1:Math.ceil(Math.max(0,(g.top>>3)-(g.SS-10))/g.SS));
+const off=n=>n<4?16+(n-1)*128:400+(n-4)*G.SS;
+const u16=o=>D[o]|D[o+1]<<8,dirOff=i=>{const e=G.SS>>4;return off(361+(i/e|0))+i%e*16};
+function loc(s){const m=0x80>>(s&7),r=[];
+ if(G.ed){if(s<720)r.push([off(360)+10+(s>>3),m]);if(s>=48&&s<1024)r.push([off(1024)+(s>>3)-6,m])}
+ else{const b=s>>3,p=G.SS-10;if(b<p)r.push([off(360)+10+b,m]);else{const k=b-p;r.push([off(359-(k/G.SS|0))+k%G.SS,m])}}
+ return r}
+const isFree=s=>{const[o,m]=loc(s)[0];return D[o]&m},setFree=(s,f)=>loc(s).forEach(([o,m])=>{f?D[o]|=m:D[o]&=~m});
+function sync(){let a=0,b=0;for(let s=0;s<G.top;s++)if(isFree(s))G.ed&&s>=720?b++:a++;const v=off(360);D[v+3]=a&255;D[v+4]=a>>8;
+ if(G.ed){const w=off(1024);D[w+122]=b&255;D[w+123]=b>>8}return a+b}
+function newDisk(k){const{N,SS}=FMT[k];G=gOf(SS,N);const t=384+(N-3)*SS,p=t>>4;D=new Uint8Array(16+t);D.set([0x96,2,p&255,p>>8&255,SS&255,SS>>8,p>>16]);
+ const v=off(360),x=G.ed?0:Math.ceil(Math.max(0,(G.top>>3)-(SS-10))/SS);D[v]=2+x;
+ for(let s=0;s<G.top;s++)setFree(s,1);
+ [0,1,2,3,...(G.ed?[720]:[]),...Array.from({length:9},(_,i)=>360+i),...Array.from({length:x},(_,i)=>359-i)].forEach(q=>setFree(q,0));
+ const c=sync();D[v+1]=c&255;D[v+2]=c>>8}
+function list(){const r=[];for(let i=0;i<G.dm;i++){const o=dirOff(i),f=D[o];if(!f||(f&0x80))continue;const t=(s,l)=>String.fromCharCode(...D.slice(s,s+l)).trim(),x=t(o+13,3);r.push({o,cnt:u16(o+1),st:u16(o+3),name:t(o+5,8)+(x?'.'+x:'')})}return r}
+function delFile(e){let s=e.st,g=0;const m=G.wide?255:3;while(s>3&&s<G.top&&g++<G.N){const o=off(s);setFree(s,1);s=(D[o+G.DB]&m)<<8|D[o+G.DB+1]}D[e.o]=0x80;sync()}
+function extractFile(e){const parts=[];let s=e.st,g=0;const m=G.wide?255:3;while(s>3&&s<G.top&&g++<G.N){const o=off(s);const len=D[o+G.DB+2];parts.push(D.subarray(o,o+Math.min(len,G.DB)));s=(D[o+G.DB]&m)<<8|D[o+G.DB+1];if(!s)break}const total=parts.reduce((a,p)=>a+p.length,0);const out=new Uint8Array(total);let pos=0;for(const p of parts){out.set(p,pos);pos+=p.length}return out}
+function fixName(n){n=n.toUpperCase();const i=n.lastIndexOf('.'),c=s=>s.replace(/[^A-Z0-9_]/g,'');return[c(i<0?n:n.slice(0,i)).slice(0,8)||'FILE',c(i<0?'':n.slice(i+1)).slice(0,3)]}
+function addFile(name,b){const[nm,ex]=fixName(name),{DB,SS}=G,full=nm+(ex?'.'+ex:'');if(!b.length)return err='Empty file: '+name,0;
+ const n=Math.ceil(b.length/DB),fr=[];for(let s=4;s<G.top&&fr.length<n;s++)if(isFree(s))fr.push(s);
+ if(fr.length<n)return err='Disk full while adding '+name,0;let slot=-1;for(let i=0;i<G.mf;i++){const f=D[dirOff(i)];if(!f||f&0x80){slot=i;break}}
+ if(slot<0)return err='Directory full ('+G.mf+' files max)',0;
+ fr.forEach((s,k)=>{const o=off(s),p=b.subarray(k*DB,k*DB+DB),nx=fr[k+1]||0;D.fill(0,o,o+SS);D.set(p,o);D[o+DB]=(G.wide?0:slot<<2)|nx>>8;D[o+DB+1]=nx&255;D[o+DB+2]=p.length;setFree(s,0)});
+ const o=dirOff(slot),t=(nm+'        ').slice(0,8)+(ex+'   ').slice(0,3);D[o]=0x42;D[o+1]=n&255;D[o+2]=n>>8;D[o+3]=fr[0]&255;D[o+4]=fr[0]>>8;
+ for(let i=0;i<11;i++)D[o+5+i]=t.charCodeAt(i);sync();return fr[0]}
+const M={LDA:{i:169,a:173,x:189,y:185,iy:177},STA:{a:141,x:157,y:153,iy:145},LDX:{i:162,a:174},LDY:{i:160,a:172},STY:{a:140},CMP:{i:201,a:205,y:217},CPY:{i:192},AND:{i:41,a:45},ORA:{a:13},SBC:{i:233,a:237},ADC:{i:105,a:109},INC:{a:238},DEC:{a:206},JSR:{a:32},JMP:{a:76,n:108},BCS:{r:176},BCC:{r:144},BNE:{r:208},BEQ:{r:240},BPL:{r:16},SEC:{m:56},CLC:{m:24},TYA:{m:152},ASL:{m:10},TAX:{m:170},RTS:{m:96},INX:{m:232},INY:{m:200},DEX:{m:202},DEY:{m:136}};
+const w=v=>[v&255,v>>8&255];
+function asm(org,src,L={}){let out;for(let p=0;p<2;p++){out=[];let pc=org;for(let ln of src.trim().split('\n')){ln=ln.trim();if(!ln)continue;
+ const lm=ln.match(/^(\w+):\s*(.*)$/);if(lm){L[lm[1]]=pc;ln=lm[2];if(!ln)continue}
+ const[mn,op='']=ln.split(/\s+/),V=s=>{const m=/^[<>]/.test(s)?s[0]:'';s=s.replace(/^[<>]/,'');const v=s[0]=='$'?parseInt(s.slice(1),16):s in L?L[s]:isNaN(+s)?0:+s;return m=='<'?v&255:m=='>'?v>>8:v};
+ let b,d=M[mn],iy=op.match(/^\((.+)\),Y$/i);
+ if(mn=='.b')b=op.split(',').map(V);else if(!d)throw'Bad op '+mn;else if(d.m!=null)b=[d.m];else if(d.r!=null){const dd=V(op)-(pc+2);if(p&&(dd<-128||dd>127))throw'Branch out of range: '+ln;b=[d.r,dd&255]}
+ else if(iy)b=[d.iy,V(iy[1])&255];else if(op[0]=='#')b=[d.i,V(op.slice(1))&255];else if(op[0]=='(')b=[d.n,...w(V(op.slice(1,-1)))];
+ else{const[a,r]=op.split(',');b=[d[r?r.toLowerCase():'a'],...w(V(a))]}
+ out.push(...b);pc+=b.length}}return out}
+// boot sector code: reads DOS-2 sector chain starting at S2 into $3000, then runs it
+const BOOT=`
+LDA #0
+STA $F0
+LDA #S2LO
+STA $F2
+LDA #S2HI
+STA $F3
+LDA #$30
+STA $F1
+rd: LDX #11
+l1: LDA TB,X
+STA $0300,X
+DEX
+BPL l1
+LDA $F0
+STA $0304
+LDA $F1
+STA $0305
+LDA $F2
+STA $030A
+LDA $F3
+STA $030B
+JSR $E459
+CPY #$80
+BCS rd
+LDY #LK
+LDA ($F0),Y
+AND #MASK
+STA $F4
+INY
+LDA ($F0),Y
+STA $F2
+LDA $F4
+STA $F3
+INY
+LDA ($F0),Y
+CLC
+ADC $F0
+STA $F0
+BCC n
+INC $F1
+n: LDA $F2
+ORA $F3
+BNE rd
+JMP $3000
+TB: .b $31,$01,$52,$40,$00,$00,$07,$00,SZLO,SZHI,$00,$00`;
+const LOADER=`
+loop: LDA #0
+STA $02E2
+STA $02E3
+LDY #0
+JSR rw
+BCS done
+LDA $0486
+AND $0487
+CMP #$FF
+BNE nh
+LDY #0
+JSR rw
+BCS done
+nh: LDY #2
+JSR rw
+BCS done
+INC $0488
+BNE e1
+INC $0489
+e1: LDA $0486
+STA $F6
+LDA $0487
+STA $F7
+LDY #0
+lp: JSR gb
+BCS done
+STA ($F6),Y
+INC $F6
+BNE e2
+INC $F7
+e2: LDA $F6
+CMP $0488
+BNE lp
+LDA $F7
+CMP $0489
+BNE lp
+LDA $02E2
+ORA $02E3
+BEQ loop
+JSR ij
+JMP loop
+ij: JMP ($02E2)
+done: JMP ($02E0)
+rw: JSR gb
+BCS rr
+STA $0486,Y
+INY
+JSR gb
+BCS rr
+STA $0486,Y
+rr: RTS
+gb: LDA $0483
+BNE have
+LDA $0484
+ORA $0485
+BEQ eof
+JSR rs
+JMP gb
+have: LDX $0482
+LDA BUF,X
+INC $0482
+DEC $0483
+CLC
+RTS
+eof: SEC
+RTS
+rs: STY $048A
+r2: LDX #11
+r1: LDA T2,X
+STA $0300,X
+DEX
+BPL r1
+LDA $0484
+STA $030A
+LDA $0485
+STA $030B
+JSR $E459
+CPY #$80
+BCS r2
+LDA LB0
+AND #MASK
+STA $0485
+LDA LB1
+STA $0484
+LDA LB2
+STA $0483
+LDA #0
+STA $0482
+LDY $048A
+RTS
+T2: .b $31,$01,$52,$40,$00,BUFH,$07,$00,SZLO,SZHI,$00,$00`;
+// menu program (runs at $3000). Per page: print page text, read key; 1-9/A-Z picks entry, nav keys flip pages (only assembled when >1 page)
+const menuSrc=nav=>`
+LDA #BG
+STA $02C6
+STA $02C8
+LDA #TXL
+STA $02C5
+LDA $0052
+STA $00F9
+LDA #0
+STA $0052
+STA $FA
+STA $FB
+LDX #$10
+LDA #3
+STA $0352
+LDA #<KN
+STA $0354
+LDA #>KN
+STA $0355
+LDA #4
+STA $035A
+LDA #0
+STA $035B
+JSR $E456
+LDA #$FF
+STA $02F0
+draw: LDX #0
+LDA #$0B
+STA $0342
+LDY $FA
+LDA PAL,Y
+STA $0344
+LDA PAH,Y
+STA $0345
+LDA PLL,Y
+STA $0348
+LDA PLH,Y
+STA $0349
+JSR $E456
+key: LDX #$10
+LDA #7
+STA $0352
+LDA #0
+STA $0358
+STA $0359
+JSR $E456
+CMP #$61
+BCC nl
+CMP #$7B
+BCS nl
+AND #$DF
+nl: STA $FC
+${nav?`LDY #4
+nx: LDA NXT,Y
+CMP $FC
+BEQ nxt
+DEY
+BPL nx
+LDY #3
+pv: LDA PRV,Y
+CMP $FC
+BEQ prv
+DEY
+BPL pv
+JMP sel
+nxt: INC $FA
+LDA $FB
+CLC
+ADC #PERP
+CMP #N
+BCC st
+LDA #0
+STA $FA
+st: STA $FB
+JMP draw
+prv: LDA $FA
+BEQ lst
+DEC $FA
+LDA $FB
+SEC
+SBC #PERP
+STA $FB
+JMP draw
+lst: LDA #NPM1
+STA $FA
+LDA #LASTB
+STA $FB
+JMP draw
+sel: `:''}LDY #0
+f: LDA $FC
+CMP KEYS,Y
+BEQ go
+INY
+CPY #KCNT
+BNE f
+JMP key
+go: TYA
+CLC
+ADC $FB
+CMP #N
+BCC ok
+JMP key
+ok: STA $F8
+LDX #$10
+LDA #12
+STA $0352
+JSR $E456
+LDX #0
+cp: LDA LDR,X
+STA $0600,X
+INX
+BNE cp
+LDX $F8
+LDA ENTL,X
+STA $0484
+LDA ENTH,X
+STA $0485
+LDA #0
+STA $0483
+LDA $00F9
+STA $0052
+JMP $0600`;
+const pgBytes=P=>P.reduce((a,l)=>a+l.length+1,0);
+// layout: <=20 entries: 1 column; more: 2 columns x 35 per page, extra pages beyond that
+function menuPages(title,labels,u){const n=labels.length,t=title.toUpperCase().slice(0,36),p=' '.repeat((40-t.length)>>1),W='BF loader v1.0',
+ c=[u[0]+'/'+u[1]+' SEC',u[0]+'/'+u[1]].find(x=>x.length+1+W.length<=39)||'',foot=c+' '.repeat(39-c.length-W.length)+W,
+ two=n>20,per=two?35:20,np=Math.max(1,Math.ceil(n/per)),P=[];
+ for(let g=0;g<np;g++){const L=[p+t,''],E=labels.slice(g*per,(g+1)*per).map((l,i)=>two?KEYS[i]+' '+l.toUpperCase().slice(0,17):'  '+KEYS[i]+'  '+l.toUpperCase().slice(0,30));
+  if(two){const r=Math.ceil(E.length/2);for(let i=0;i<r;i++)L.push((E[i].padEnd(20)+(E[r+i]||'')).trimEnd())}else L.push(...E);
+  const pr=two?22:Math.min(L.length+1,22);while(L.length<pr)L.push('');
+  L.push(np>1?'  <>:PAGE '+(g+1)+'/'+np:'');while(L.length<23)L.push('');L.push(foot);P.push(L)}
+ return P}
+// files:[{name,bytes}], ents:[{label,file}] (file = object from files), returns ATR bytes
+function buildPlainATR(files){
+  if(!files.length)throw'Drop at least one file first.';
+  if(base){D=new Uint8Array(base.bytes);G=base.G}else newDisk($('#fmt').value);
+  for(const f of files){if(f.ex)continue;const s=addFile(f.name,f.bytes);if(!s)throw err;}
+  return new Uint8Array(D);
+}
+function buildATR(files,ents,title,hue,tl=7,inv=false){
+ if(!files.length)throw'Drop at least one file first.';if(!ents.length)throw'Add at least one menu entry.';if(ents.length>MAXE)throw'Max '+MAXE+' menu entries.';
+ if(base){D=new Uint8Array(base.bytes);G=base.G}else newDisk($('#fmt').value);const st=new Map(),X={MASK:G.wide?255:3,SZLO:G.SS&255,SZHI:G.SS>>8};
+ for(const f of files){const s=f.ex?f.st:addFile(f.name,f.bytes);if(!s)throw err;st.set(f,s)}
+ const n=ents.length,np=Math.max(1,Math.ceil(n/(n>20?35:20))),labels=ents.map(e=>e.label),tot=totalSec(G),
+  mu=Math.ceil((0x480+menuPages(title,labels,[0,0]).reduce((a,P)=>a+pgBytes(P),0))/G.DB),A=s=>[...s].map(c=>c.charCodeAt(0)&255),
+  PG=menuPages(title,labels,[tot-(sync()-mu),tot]).map(P=>[0x7D,...P.flatMap((l,i)=>[...A(l),...(i<P.length-1?[0x9B]:[])])]);
+ const code=asm(0x3000,menuSrc(np>1),{KN:0x3300,KEYS:0x3310,NXT:0x3340,PRV:0x3348,PAL:0x3350,PAH:0x3358,PLL:0x3360,PLH:0x3368,ENTL:0x3380,ENTH:0x3400,LDR:0x3200,N:n,KCNT:Math.min(35,n),PERP:35,NPM1:np-1,LASTB:(np-1)*35,BG:hue*16+(inv?tl*2:2),TXL:inv?2:tl*2}),
+  ldr=asm(0x600,LOADER,{...X,BUF:G.buf,BUFH:G.buf>>8,LB0:G.buf+G.DB,LB1:G.buf+G.DB+1,LB2:G.buf+G.DB+2});
+ if(code.length>512||ldr.length>256)throw'Internal: code too large ('+code.length+'/'+ldr.length+')';
+ const img=new Uint8Array(0x480+PG.reduce((a,b)=>a+b.length,0));img.set(code,0);img.set(ldr,0x200);img.set([0x4B,0x3A,0x9B],0x300);img.set(A(KEYS),0x310);
+ img.set([0x2E,0x3E,0x20,0x1F,0x2B],0x340);img.set([0x2C,0x3C,0x1E,0x2D],0x348);
+ let a=0x3480,o=0x480;PG.forEach((b,g)=>{img[0x350+g]=a&255;img[0x358+g]=a>>8;img[0x360+g]=b.length&255;img[0x368+g]=b.length>>8;img.set(b,o);o+=b.length;a+=b.length});
+ ents.forEach((e,i)=>{const s=st.get(e.file);img[0x380+i]=s&255;img[0x400+i]=s>>8});
+ const s2=addFile('MENU.SYS',img);if(!s2)throw err;
+ const boot=[0,3,0,7,6,7,...asm(0x706,BOOT,{...X,S2LO:s2&255,S2HI:s2>>8,LK:G.DB})];if(boot.length>384)throw'Boot too large';
+ D.set(boot,off(1));return{atr:D,free:sync(),sizes:[code.length,ldr.length,boot.length]}}
+const $=s=>document.querySelector(s),say=t=>$('#st').textContent=t;
+let files=[],ents=[],base=null;const cc={};
+const geo=()=>base?base.G:gOf(FMT[$('#fmt').value].SS,FMT[$('#fmt').value].N);
+const cap=()=>{if(base)return base.free;const k=$('#fmt').value;if(!(k in cc)){newDisk(k);cc[k]=sync()}return cc[k]};
+const menuBytes=L=>0x480+menuPages('X',L,[0,0]).reduce((a,P)=>a+pgBytes(P),0);
+const menuSec=()=>Math.ceil(menuBytes((ents.length?ents.map(e=>e.label):files.map(f=>f.name.replace(/\..*/,''))).slice(0,MAXE))/geo().DB)+1;
+const need=()=>files.reduce((a,f)=>a+(f.ex?0:Math.ceil(f.bytes.length/geo().DB)),0)+menuSec();
+function dl(n,b){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([b]));a.download=n;a.click()}
+function loadATR(name,b){
+ if(b.length<400||b[0]!=0x96||b[1]!=2)return'Not a valid ATR image: '+name;
+ const SS=b[4]|b[5]<<8,t=(b[2]|b[3]<<8|b[6]<<16)*16;
+ if(SS!=128&&SS!=256)return'Unsupported sector size '+SS+' in '+name+' (need 128 or 256)';
+ const N=SS==128?t/128:3+(t-384)/SS;
+ if(!Number.isInteger(N)||N<720||(SS==128&&N>720&&N<1024)||b.length<16+t)return'Unsupported or truncated disk geometry in '+name;
+ D=b.slice(0,16+t);G=gOf(SS,N);
+ if(D[off(360)]<2||D[off(360)]>5)return'No DOS 2 / MyDOS file system found in '+name;
+ const old=list().find(e=>e.name=='MENU.SYS');if(old)delFile(old);
+ const fl=list().map(e=>({name:e.name,ex:1,st:e.st,cnt:e.cnt,o:e.o,bin:e.st>3&&e.st<N&&D[off(e.st)]==255&&D[off(e.st)+1]==255}));
+ base={name,bytes:D,G,old:!!old,free:sync()};files=[...fl,...files.filter(f=>!f.ex)];ents=[];return''
+}
+async function take(fs){let atr=0;for(const f of fs){const b=new Uint8Array(await f.arrayBuffer());
+ if(/\.atr$/i.test(f.name)){const m=loadATR(f.name,b);if(m)say(m);else atr=1;continue}
+ let n=f.name,k=2;while(files.some(x=>fixName(x.name).join('.')==fixName(n).join('.'))){const[a,e]=fixName(f.name);n=a.slice(0,7)+(k++)+'.'+e}files.push({name:n,bytes:b})}
+ r1();if(atr){toMenu();if(!$('#p2').hidden)say('Loaded '+base.name+(base.old?' (previous ATRmenu menu replaced)':'')+' – '+ents.length+' of '+files.length+' files added as menu entries'+(ents.length<files.length?' (non-XEX and DOS files skipped; add them with + Entry)':'')+'.')}}
+function r1(){const g=geo(),C=cap();
+ $('#fl').innerHTML=files.map((f,i)=>{
+  if(f.ex){const sys=/^(DOS|DUP|AUTORUN|MENU)\./i.test(f.name)||/\.(SYS|SUP)$/i.test(f.name);const tag=f.bin?'':(sys?' · system':' ⚠ not XEX');
+    return `<div class="er"><input value="${f.name.replace(/"/g,'&quot;')}" disabled><small style="width:auto">${f.cnt} sec${tag} · on disk</small><button data-dl="${i}" title="Download">↓</button><button data-rmdisk="${i}" title="Delete from ATR">✕</button></div>`}
+  return `<div class="er"><input data-i="${i}" value="${f.name.replace(/"/g,'&quot;')}"><small>${f.bytes.length} B</small><button data-dl="${i}" title="Download">↓</button><button data-rm="${i}">✕</button></div>`
+}).join('');
+ $('#fmtrow').hidden=!!base;$('#ld').hidden=!base;if(base)$('#ld').textContent='Loaded '+base.name+' · '+g.N+' × '+g.SS+' B'+(g.ed?' (enhanced)':'')+' · '+base.free+' free sectors. “Clear” unloads it.';
+ const n=need(),p=Math.min(100,n/C*100);$('#bar').className='bar'+(n>C?' bad':'');$('#bar i').style.width=p+'%';
+ if(base){$('#cap').textContent=base.free+' free sectors · menu ~'+menuSec()+' · '+(n>C?'need more space — delete files':'OK to build')}else{$('#cap').textContent=n+' / '+C+' sectors used (incl. '+menuSec()+' for the menu) – '+FMT[$('#fmt').value].t+(n>C?' — TOO BIG, remove files or pick a bigger format':'')}}
+$('#fl').addEventListener('input',e=>{files[+e.target.dataset.i].name=e.target.value;});
+$('#fl').addEventListener('click',e=>{
+  const t=e.target;
+  if(t.dataset.rm!=null){files.splice(+t.dataset.rm,1);r1();return}
+  if(t.dataset.rmdisk!=null){
+    const i=+t.dataset.rmdisk,f=files[i];if(!f||!f.ex)return;
+    const entry=list().find(e=>e.name===f.name||(e.st===f.st&&e.cnt===f.cnt));
+    if(entry){delFile(entry);base.bytes=D;base.free=sync()}
+    files.splice(i,1);ents=ents.filter(e=>e.file!==f);r1();
+    say('Deleted '+f.name+' · '+base.free+' free sectors.');return}
+  if(t.dataset.dl!=null){
+    const i=+t.dataset.dl,f=files[i];if(!f)return;
+    let bytes;if(f.ex){const entry=list().find(e=>e.name===f.name||(e.st===f.st&&e.cnt===f.cnt));if(!entry){say('Could not locate '+f.name);return}bytes=extractFile(entry)}else bytes=f.bytes;
+    dl((f.name.replace(/[^\w.\-]+/g,'_')||'file.bin'),bytes);say('Downloaded '+f.name+' ('+bytes.length+' bytes).')}
+});
+$('#drop').onclick=()=>$('#fi').click();$('#fi').onchange=e=>{take(e.target.files);e.target.value=''};
+addEventListener('dragover',e=>{e.preventDefault();$('#drop').classList.add('hv')});addEventListener('dragleave',()=>$('#drop').classList.remove('hv'));
+addEventListener('drop',e=>{e.preventDefault();$('#drop').classList.remove('hv');take(e.dataTransfer.files)});
+$('#clr').onclick=()=>{files=[];ents=[];base=null;r1()};
+function step(n){$('#p1').hidden=n!=1;$('#p2').hidden=n!=2;$('#s1').className=n==1?'on':'';$('#s2').className=n==2?'on':'';say('')}
+function toMenu(){if(!files.length)return say('Add at least one file.');
+ const sys=/^(DOS|DUP)\.SYS$/i;ents=ents.filter(e=>files.includes(e.file));files.filter(f=>!ents.some(e=>e.file==f)&&(!f.ex||(f.bin&&!sys.test(f.name)))).forEach(f=>ents.push({label:f.name.replace(/\..*/,''),file:f}));ents=ents.slice(0,MAXE);sortEnts();
+ const menuNeed=Math.ceil(menuBytes(ents.map(e=>e.label))/geo().DB)+1;
+ const newNeed=files.reduce((a,f)=>a+(f.ex?0:Math.ceil(f.bytes.length/geo().DB)),0);
+ if(menuNeed+newNeed>cap())say('Warning: need ~'+(menuNeed+newNeed)+' sectors, '+cap()+' free. Delete files or remove entries before building.');
+ step(2);r2();if(ents.length>20)say(ents.length+' entries – '+(ents.length>35?Math.ceil(ents.length/35)+' pages, 2 columns each':'2-column layout')+'. Labels are cut to 17 characters.')}
+$('#nx').onclick=toMenu;$('#fmt').innerHTML=Object.entries(FMT).map(([k,v])=>`<option value="${k}">${v.t}</option>`).join('');$('#fmt').onchange=r1;
+$('#bk').onclick=()=>{step(1);r1()};
+function r2(){$('#ents').innerHTML=ents.map((e,i)=>`<div class="er"><b>${ents.length>35?((i/35|0)+1)+'·':''}${KEYS[i%35]}</b><input data-i="${i}" value="${e.label.replace(/"/g,'&quot;')}" maxlength="30" placeholder="label"><span class="fn" title="${e.file.name.replace(/"/g,'&quot;')}">${e.file.name}</span><button data-up="${i}">↑</button><button data-dn="${i}">↓</button><button data-rm="${i}">✕</button></div>`).join('');pv()}
+// GTIA colour -> RGB for the preview. Text hue always equals the background hue on the Atari (only luminance differs).
+// "alt": linear luma, no extra gamma, chroma 0.25, 24° hue steps starting at 340° on the YIQ wheel (hue 1 gold ... 5 purple, 7-8 blue, 12 green).
+// "a800": Atari800 NTSC model (CGIA luma table, gamma 2.35). "file": a 768-byte .act/.pal palette loaded by the user (exact).
+// GTIA colour -> RGB for the preview (Altirra-like NTSC: linear luma, chroma 0.25, 26.8° hue steps, hue 1 at 3°).
+// The Atari text hue always equals the background hue; only luminance differs.
+const ac=(h,l)=>{const y=l/15,a=(363+(h-1)*26.8)*Math.PI/180,k=h?.25:0,i=Math.cos(a)*k,q=Math.sin(a)*k,f=x=>Math.round(Math.max(0,Math.min(1,x))*255);
+ return`rgb(${f(y+.9563*i+.621*q)},${f(y-.2721*i-.6474*q)},${f(y-1.107*i+1.7046*q)})`};
+function fit(){const e=$('#pv'),W=e.clientWidth;if(!W)return;const cw=W*.857/40,fs=cw*1.12;
+ Object.assign(e.style,{padding:W*.118+'px '+W*.0714+'px',fontSize:fs+'px',lineHeight:cw+'px',letterSpacing:(cw-.6*fs)+'px'})}
+const usage=()=>{const g=geo(),mu=Math.ceil(menuBytes(ents.map(e=>e.label))/g.DB),T=totalSec(g),fr=cap()-files.reduce((a,f)=>a+(f.ex?0:Math.ceil(f.bytes.length/g.DB)),0)-mu;return[T-fr,T]};
+let pvp=0,pp;
+function pv(){const h=+$('#hue').value,t=+$('#tc').value;const iv=$('#inv').checked,bg=ac(h,iv?t*2:2);Object.assign($('#pv').style,{color:ac(h,iv?2:t*2),background:bg});(pp=menuPages($('#title').value,ents.map(e=>e.label),usage()),pvp=Math.min(pvp,pp.length-1),$('#pgr').hidden=pp.length<2,$('#pg').textContent='Page '+(pvp+1)+' / '+pp.length,$('#pv').textContent=pp[pvp].join('\n'));fit()}
+$('#ents').addEventListener('input',e=>{const i=+e.target.dataset.i;if(e.target.tagName=='INPUT')ents[i].label=e.target.value;else ents[i].file=files[+e.target.value];pv()});
+$('#ents').addEventListener('click',e=>{const d=e.target.dataset,sw=(i,j)=>{if(j>=0&&j<ents.length){[ents[i],ents[j]]=[ents[j],ents[i]];$('#ord').value='m'}};
+ if(d.rm!=null)ents.splice(+d.rm,1);else if(d.up!=null)sw(+d.up,+d.up-1);else if(d.dn!=null)sw(+d.dn,+d.dn+1);else return;r2()});
+$('#ae').onclick=()=>{if(ents.length>=MAXE)return say('Max '+MAXE+' entries.');const f=files[0];ents.push({label:f.name.replace(/\..*/,''),file:f});sortEnts();r2()};
+$('#pp').onclick=()=>{pvp=Math.max(0,pvp-1);pv()};$('#pn').onclick=()=>{pvp++;pv()};$('#title').oninput=$('#hue').oninput=$('#tc').oninput=$('#inv').onchange=pv;
+$('#plain').onclick=()=>{try{const atr=buildPlainATR(files);dl(base?base.name.replace(/\\.atr$/i,'')+'_without_menu.atr':'files.atr',atr);say('Exported ATR without menu – '+files.length+' files included.')}catch(e){say(''+e)}};
+$('#mk').onclick=()=>{try{const r=buildATR(files,ents,$('#title').value,+$('#hue').value,+$('#tc').value,$('#inv').checked);dl(base?base.name.replace(/\.atr$/i,'')+'_menu.atr':'menudisk.atr',r.atr);say('Built disk image – '+r.free+' free sectors. Boot it in Altirra or on a drive.')}catch(e){say(''+e)}};
+const sortEnts=()=>{const m=$('#ord').value;if(m=='m')return;const c=(a,b)=>a.label.localeCompare(b.label,undefined,{numeric:true,sensitivity:'base'});ents.sort((a,b)=>m=='z'?c(b,a):c(a,b))};
+$('#ord').onchange=()=>{sortEnts();r2()};
+$('#ents').addEventListener('change',e=>{if(e.target.tagName=='INPUT'&&$('#ord').value!='m'){sortEnts();r2()}});
+
+addEventListener('resize',fit);
+r1();
+</script></body></html>
