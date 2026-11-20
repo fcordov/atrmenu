@@ -1,0 +1,547 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ATRmenu – build a bootable Atari 8-bit menu disk</title>
+<style>
+:root{--bg:#14161c;--pn:#1e222b;--bd:#343a48;--fg:#e8e6df;--ac:#f0a030;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.4 system-ui,sans-serif}
+header{padding:12px 16px;border-bottom:1px solid var(--bd);display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+h1{margin:0;font-size:18px;color:var(--ac)}
+.brand{margin-left:auto;font-size:12px;color:#9aa;white-space:nowrap}
+#lang{padding:3px 10px;font-size:12px}
+#plain{background:#f57c00;border-color:#f57c00;color:#111;font-weight:600}#plain:hover{background:#ff9800;border-color:#ff9800}
+#mk{background:#c62828;border-color:#c62828;color:#fff;font-weight:600}#mk:hover{background:#e53935;border-color:#e53935}
+.steps span{padding:4px 10px;border-radius:12px;border:1px solid var(--bd);color:#9aa;margin-right:6px}
+.steps .on{background:var(--ac);color:#111;border-color:var(--ac)}
+main{max-width:900px;margin:0 auto;padding:12px}
+section{background:var(--pn);border:1px solid var(--bd);border-radius:8px;padding:14px;margin-bottom:12px}
+button,select,input{background:#10131a;color:var(--fg);border:1px solid var(--bd);border-radius:5px;padding:6px 9px;font:inherit}
+button{cursor:pointer}button:hover{border-color:var(--ac)}
+button.go{background:var(--ac);color:#111;border-color:var(--ac);font-weight:600}
+#drop{border:2px dashed var(--bd);border-radius:8px;padding:28px;text-align:center;cursor:pointer;color:#9aa}
+#drop.hv{border-color:var(--ac);color:var(--ac)}
+.er{display:flex;gap:6px;margin:6px 0;align-items:center;flex-wrap:nowrap}
+.er input{flex:1;min-width:0}
+.er b{width:28px;flex-shrink:0;color:var(--ac)}
+.er small{flex-shrink:0;color:#9aa}
+#ents .er{gap:8px;width:100%}
+#ents .er input{flex:1 1 auto;min-width:280px}
+#ents .er .fn{flex:0 1 180px;min-width:0;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#9aa}
+#ents .er button{flex-shrink:0;padding:4px 8px;margin:0}
+.bar{height:8px;background:#10131a;border-radius:4px;overflow:hidden;margin:8px 0}
+.bar i{display:block;height:100%;background:var(--ac)}.bar.bad i{background:#e55}
+#pv{box-sizing:border-box;width:min(100%,560px);aspect-ratio:4/3;margin:10px auto 0;color:#f4f4f4;white-space:pre;overflow:hidden;border-radius:4px;font-family:"Courier New","Liberation Mono",monospace}
+#colors{display:flex;gap:20px;flex-wrap:wrap;align-items:center;margin-top:10px}
+#colors label{display:flex;gap:8px;align-items:center;font-size:13px;color:#9aa}
+#colors input[type=range]{width:140px;accent-color:var(--ac)}
+small{color:#9aa}
+#st{color:var(--ac);min-height:20px;margin-top:8px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+</style></head><body>
+<header>
+  <h1>ATRmenu</h1>
+  <div class="steps"><span id="s1" class="on">1 · Files → ATR</span><span id="s2">2 · Disk menu</span></div>
+  <small>100% offline · bootable without DOS · v11</small>
+  <span class="brand">BF loader v1.0, 2026</span><button id="lang" title="Idioma / Language">Español</button>
+</header>
+<main>
+<section id="p1"><div class="row" id="fmtrow" style="margin:0 0 10px"><label>New disk format <select id="fmt"></select></label><label>Sectors <input id="cn" type="number" min="400" max="65535" value="720" style="width:84px" disabled></label><label>Boot sectors <input id="cb" type="number" min="0" max="32" value="3" style="width:64px" disabled></label><label>Sector size <select id="cs" disabled><option>128</option><option>256</option><option>512</option></select> bytes</label><small>…or drop an existing .ATR to jump straight to the menu</small></div><div id="ld" hidden style="color:var(--ac);margin-bottom:8px"></div><div id="drop">Drop .XEX / .BIN / .COM files here, or click to choose<br><small>Drop an .ATR image to build a menu for the files already on it</small></div><input type="file" id="fi" multiple hidden>
+<div id="fl"></div><div class="bar" id="bar"><i></i></div><small id="cap"></small>
+<div class="row"><button id="clr">Clear</button><label title="Adds a bootable DOS (from your reference disks) to the ATR exported without a menu. Not used when building a menu.">DOS <select id="dos"><option value="">No DOS</option><option value="d25">Atari DOS 2.5</option><option value="d2p">DOS II+</option><option value="myd">MyDOS 4.5</option></select></label><button id="plain">Export ATR without menu</button><button class="go" id="nx" style="margin-left:auto">Next: build menu →</button></div></section>
+<section id="p2" hidden>
+  <div class="row" style="margin:0 0 8px">
+    <input id="title" value="MY DISK MENU" maxlength="36" style="flex:1;min-width:180px" placeholder="Menu title"><label style="display:flex;gap:6px;align-items:center;font-size:13px;color:#9aa">Order <select id="ord"><option value="m">Manual</option><option value="a">Alphabetical A → Z</option><option value="z">Alphabetical Z → A</option></select></label>
+  </div>
+  <div id="ents"></div>
+  <div class="row">
+    <button id="ae">+ Entry</button>
+    <button id="bk">← Back to files</button>
+  </div>
+  <div id="pv"></div>
+  <div class="row" id="pgr" hidden style="justify-content:center">
+    <button id="pp">◀ Prev</button>
+    <small id="pg"></small>
+    <button id="pn">Next ▶</button>
+  </div>
+  <div id="colors">
+    <label>Background color <input id="hue" type="range" min="0" max="15" value="9"></label>
+    <label title="On the Atari the text hue follows the background; this sets the text contrast (brightness)">Text contrast <input id="tc" type="range" min="0" max="7" value="7"></label>
+    <label style="margin-left:auto" title="Swap text and background brightness (hue stays the same)"><input type="checkbox" id="inv" style="width:16px;height:16px;padding:0;accent-color:var(--ac)"> Invert colors</label>
+  </div>
+  <small>Keys 1–9, A–Z start the program; with several pages flip with , . (or &lt; &gt;), + −, SPACE or the arrow keys. Disk boots straight into the menu (no DOS needed).</small>
+  <div class="row" style="justify-content:flex-end"><button class="go" id="mk">Build bootable ATR ↓</button></div>
+</section>
+<div id="st"></div></main>
+<script>
+let LANG='en';
+const KEYS='123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ',MAXE=128;
+const FMT={sd:{N:720,SS:128,t:'SD · 90 KB (720 × 128)'},md:{N:1040,SS:128,t:'MD · 130 KB enhanced (1040 × 128)'},dd:{N:720,SS:256,t:'DD · 180 KB (720 × 256)'},qd:{N:1440,SS:256,t:'QD · 360 KB (1440 × 256)'},ds:{N:2880,SS:256,t:'DS/QD · 720 KB (2880 × 256)'}};
+// current disk format: preset or custom fields (sector count, boot sectors, sector size)
+const fm=()=>{const k=$('#fmt').value;if(k!='custom')return{...FMT[k],bs:3};const N=Math.max(400,Math.min(65535,(+$('#cn').value|0)||720)),bs=Math.max(0,Math.min(32,+$('#cb').value|0)),SS=[128,256,512].includes(+$('#cs').value)?+$('#cs').value:128;
+ return{N,SS,bs,t:'Custom · '+N+' × '+SS+(bs!=3?' ('+bs+' boot sectors)':'')}};
+let D=null,G=null,err='';
+// geometry: ed = DOS 2.5 enhanced density (VTOC2 @1024); wide = >1024 sectors, 16-bit sector links (MyDOS style, no file id)
+const gOf=(SS,N,bs=3)=>{const ed=SS==128&&N>=1024&&N<=1040,wide=!ed&&N>1024,dm=(SS>>4)*8;return{SS,N,bs,ed,wide,top:ed?1024:N,buf:SS==128?0x400:SS==256?0x500:0x700,DB:Math.min(SS,256)-3,dm,mf:wide?dm:Math.min(64,dm)}};
+const totalSec=g=>g.top-13-Math.max(0,g.bs-3)-(g.ed?1:Math.ceil(Math.max(0,(g.top>>3)-(g.SS-10))/g.SS));
+const off=n=>n<=G.bs?16+(n-1)*128:16+G.bs*128+(n-1-G.bs)*G.SS;
+const u16=o=>D[o]|D[o+1]<<8,dirOff=i=>{const e=G.SS>>4;return off(361+(i/e|0))+i%e*16};
+function loc(s){const m=0x80>>(s&7),r=[];
+ if(G.ed){if(s<720)r.push([off(360)+10+(s>>3),m]);if(s>=48&&s<1024)r.push([off(1024)+(s>>3)-6,m])}
+ else{const b=s>>3,p=G.SS-10;if(b<p)r.push([off(360)+10+b,m]);else{const k=b-p;r.push([off(359-(k/G.SS|0))+k%G.SS,m])}}
+ return r}
+const isFree=s=>{const[o,m]=loc(s)[0];return D[o]&m},setFree=(s,f)=>loc(s).forEach(([o,m])=>{f?D[o]|=m:D[o]&=~m});
+function sync(){let a=0,b=0;for(let s=0;s<G.top;s++)if(isFree(s))G.ed&&s>=720?b++:a++;const v=off(360);D[v+3]=a&255;D[v+4]=a>>8;
+ if(G.ed){const w=off(1024);D[w+122]=b&255;D[w+123]=b>>8}return a+b}
+function newDisk(f){const{N,SS,bs}=f;G=gOf(SS,N,bs);const t=bs*128+(N-bs)*SS,p=t>>4;D=new Uint8Array(16+t);D.set([0x96,2,p&255,p>>8&255,SS&255,SS>>8,p>>16]);
+ const v=off(360),x=G.ed?0:Math.ceil(Math.max(0,(G.top>>3)-(SS-10))/SS);D[v]=2+x;
+ for(let s=0;s<G.top;s++)setFree(s,1);
+ [0,...Array.from({length:Math.max(3,bs)},(_,i)=>i+1),...(G.ed?[720]:[]),...Array.from({length:9},(_,i)=>360+i),...Array.from({length:x},(_,i)=>359-i)].forEach(q=>setFree(q,0));
+ const c=sync();D[v+1]=c&255;D[v+2]=c>>8}
+function list(){const r=[];for(let i=0;i<G.dm;i++){const o=dirOff(i),f=D[o];if(!f||(f&0x80))continue;const t=(s,l)=>String.fromCharCode(...D.slice(s,s+l)).trim(),x=t(o+13,3);r.push({o,cnt:u16(o+1),st:u16(o+3),name:t(o+5,8)+(x?'.'+x:'')})}return r}
+function delFile(e){let s=e.st,g=0;const m=G.wide?255:3;while(s>3&&s<G.top&&g++<G.N){const o=off(s);setFree(s,1);s=(D[o+G.DB]&m)<<8|D[o+G.DB+1]}D[e.o]=0x80;sync()}
+function extractFile(e){const parts=[];let s=e.st,g=0;const m=G.wide?255:3;while(s>3&&s<G.top&&g++<G.N){const o=off(s);const len=D[o+G.DB+2];parts.push(D.subarray(o,o+Math.min(len,G.DB)));s=(D[o+G.DB]&m)<<8|D[o+G.DB+1];if(!s)break}const total=parts.reduce((a,p)=>a+p.length,0);const out=new Uint8Array(total);let pos=0;for(const p of parts){out.set(p,pos);pos+=p.length}return out}
+function fixName(n){n=n.toUpperCase();const i=n.lastIndexOf('.'),c=s=>s.replace(/[^A-Z0-9_]/g,'');return[c(i<0?n:n.slice(0,i)).slice(0,8)||'FILE',c(i<0?'':n.slice(i+1)).slice(0,3)]}
+function addFile(name,b){const[nm,ex]=fixName(name),{DB,SS}=G,full=nm+(ex?'.'+ex:'');if(!b.length)return err='Empty file: '+name,0;
+ const n=Math.ceil(b.length/DB),fr=[];for(let s=4;s<G.top&&fr.length<n;s++)if(isFree(s))fr.push(s);
+ if(fr.length<n)return err='Disk full while adding '+name,0;let slot=-1;for(let i=0;i<G.mf;i++){const f=D[dirOff(i)];if(!f||f&0x80){slot=i;break}}
+ if(slot<0)return err='Directory full ('+G.mf+' files max)',0;
+ fr.forEach((s,k)=>{const o=off(s),p=b.subarray(k*DB,k*DB+DB),nx=fr[k+1]||0;D.fill(0,o,o+SS);D.set(p,o);D[o+DB]=(G.wide?0:slot<<2)|nx>>8;D[o+DB+1]=nx&255;D[o+DB+2]=p.length;setFree(s,0)});
+ const o=dirOff(slot),t=(nm+'        ').slice(0,8)+(ex+'   ').slice(0,3);D[o]=0x42;D[o+1]=n&255;D[o+2]=n>>8;D[o+3]=fr[0]&255;D[o+4]=fr[0]>>8;
+ for(let i=0;i<11;i++)D[o+5+i]=t.charCodeAt(i);sync();return fr[0]}
+const M={LDA:{i:169,a:173,x:189,y:185,iy:177},STA:{a:141,x:157,y:153,iy:145},LDX:{i:162,a:174},LDY:{i:160,a:172},STY:{a:140},CMP:{i:201,a:205,y:217},CPY:{i:192},AND:{i:41,a:45},ORA:{a:13},SBC:{i:233,a:237},ADC:{i:105,a:109},INC:{a:238},DEC:{a:206},JSR:{a:32},JMP:{a:76,n:108},BCS:{r:176},BCC:{r:144},BNE:{r:208},BEQ:{r:240},BPL:{r:16},SEC:{m:56},CLC:{m:24},TYA:{m:152},ASL:{m:10},TAX:{m:170},RTS:{m:96},INX:{m:232},INY:{m:200},DEX:{m:202},DEY:{m:136}};
+const w=v=>[v&255,v>>8&255];
+function asm(org,src,L={}){let out;for(let p=0;p<2;p++){out=[];let pc=org;for(let ln of src.trim().split('\n')){ln=ln.trim();if(!ln)continue;
+ const lm=ln.match(/^(\w+):\s*(.*)$/);if(lm){L[lm[1]]=pc;ln=lm[2];if(!ln)continue}
+ const[mn,op='']=ln.split(/\s+/),V=s=>{const m=/^[<>]/.test(s)?s[0]:'';s=s.replace(/^[<>]/,'');const v=s[0]=='$'?parseInt(s.slice(1),16):s in L?L[s]:isNaN(+s)?0:+s;return m=='<'?v&255:m=='>'?v>>8:v};
+ let b,d=M[mn],iy=op.match(/^\((.+)\),Y$/i);
+ if(mn=='.b')b=op.split(',').map(V);else if(!d)throw'Bad op '+mn;else if(d.m!=null)b=[d.m];else if(d.r!=null){const dd=V(op)-(pc+2);if(p&&(dd<-128||dd>127))throw'Branch out of range: '+ln;b=[d.r,dd&255]}
+ else if(iy)b=[d.iy,V(iy[1])&255];else if(op[0]=='#')b=[d.i,V(op.slice(1))&255];else if(op[0]=='(')b=[d.n,...w(V(op.slice(1,-1)))];
+ else{const[a,r]=op.split(',');b=[d[r?r.toLowerCase():'a'],...w(V(a))]}
+ out.push(...b);pc+=b.length}}return out}
+// boot sector code: reads DOS-2 sector chain starting at S2 into $3000, then runs it
+const BOOT=`
+LDA #0
+STA $F0
+LDA #S2LO
+STA $F2
+LDA #S2HI
+STA $F3
+LDA #$30
+STA $F1
+rd: LDX #11
+l1: LDA TB,X
+STA $0300,X
+DEX
+BPL l1
+LDA $F0
+STA $0304
+LDA $F1
+STA $0305
+LDA $F2
+STA $030A
+LDA $F3
+STA $030B
+JSR $E459
+CPY #$80
+BCS rd
+LDY #LK
+LDA ($F0),Y
+AND #MASK
+STA $F4
+INY
+LDA ($F0),Y
+STA $F2
+LDA $F4
+STA $F3
+INY
+LDA ($F0),Y
+CLC
+ADC $F0
+STA $F0
+BCC n
+INC $F1
+n: LDA $F2
+ORA $F3
+BNE rd
+JMP $3000
+TB: .b $31,$01,$52,$40,$00,$00,$07,$00,SZLO,SZHI,$00,$00`;
+const LOADER=`
+loop: LDA #0
+STA $02E2
+STA $02E3
+LDY #0
+JSR rw
+BCS done
+LDA $0486
+AND $0487
+CMP #$FF
+BNE nh
+LDY #0
+JSR rw
+BCS done
+nh: LDY #2
+JSR rw
+BCS done
+INC $0488
+BNE e1
+INC $0489
+e1: LDA $0486
+STA $F6
+LDA $0487
+STA $F7
+LDY #0
+lp: JSR gb
+BCS done
+STA ($F6),Y
+INC $F6
+BNE e2
+INC $F7
+e2: LDA $F6
+CMP $0488
+BNE lp
+LDA $F7
+CMP $0489
+BNE lp
+LDA $02E2
+ORA $02E3
+BEQ loop
+JSR ij
+JMP loop
+ij: JMP ($02E2)
+done: JMP ($02E0)
+rw: JSR gb
+BCS rr
+STA $0486,Y
+INY
+JSR gb
+BCS rr
+STA $0486,Y
+rr: RTS
+gb: LDA $0483
+BNE have
+LDA $0484
+ORA $0485
+BEQ eof
+JSR rs
+JMP gb
+have: LDX $0482
+LDA BUF,X
+INC $0482
+DEC $0483
+CLC
+RTS
+eof: SEC
+RTS
+rs: STY $048A
+r2: LDX #11
+r1: LDA T2,X
+STA $0300,X
+DEX
+BPL r1
+LDA $0484
+STA $030A
+LDA $0485
+STA $030B
+JSR $E459
+CPY #$80
+BCS r2
+LDA LB0
+AND #MASK
+STA $0485
+LDA LB1
+STA $0484
+LDA LB2
+STA $0483
+LDA #0
+STA $0482
+LDY $048A
+RTS
+T2: .b $31,$01,$52,$40,$00,BUFH,$07,$00,SZLO,SZHI,$00,$00`;
+// menu program (runs at $3000). Per page: print page text, read key; 1-9/A-Z picks entry, nav keys flip pages (only assembled when >1 page)
+const menuSrc=nav=>`
+LDA #BG
+STA $02C6
+STA $02C8
+LDA #TXL
+STA $02C5
+LDA $0052
+STA $00F9
+LDA #0
+STA $0052
+STA $FA
+STA $FB
+LDX #$10
+LDA #3
+STA $0352
+LDA #<KN
+STA $0354
+LDA #>KN
+STA $0355
+LDA #4
+STA $035A
+LDA #0
+STA $035B
+JSR $E456
+LDA #$FF
+STA $02F0
+draw: LDX #0
+LDA #$0B
+STA $0342
+LDY $FA
+LDA PAL,Y
+STA $0344
+LDA PAH,Y
+STA $0345
+LDA PLL,Y
+STA $0348
+LDA PLH,Y
+STA $0349
+JSR $E456
+key: LDX #$10
+LDA #7
+STA $0352
+LDA #0
+STA $0358
+STA $0359
+JSR $E456
+CMP #$61
+BCC nl
+CMP #$7B
+BCS nl
+AND #$DF
+nl: STA $FC
+${nav?`LDY #4
+nx: LDA NXT,Y
+CMP $FC
+BEQ nxt
+DEY
+BPL nx
+LDY #3
+pv: LDA PRV,Y
+CMP $FC
+BEQ prv
+DEY
+BPL pv
+JMP sel
+nxt: INC $FA
+LDA $FB
+CLC
+ADC #PERP
+CMP #N
+BCC st
+LDA #0
+STA $FA
+st: STA $FB
+JMP draw
+prv: LDA $FA
+BEQ lst
+DEC $FA
+LDA $FB
+SEC
+SBC #PERP
+STA $FB
+JMP draw
+lst: LDA #NPM1
+STA $FA
+LDA #LASTB
+STA $FB
+JMP draw
+sel: `:''}LDY #0
+f: LDA $FC
+CMP KEYS,Y
+BEQ go
+INY
+CPY #KCNT
+BNE f
+JMP key
+go: TYA
+CLC
+ADC $FB
+CMP #N
+BCC ok
+JMP key
+ok: STA $F8
+LDX #$10
+LDA #12
+STA $0352
+JSR $E456
+LDX #0
+cp: LDA LDR,X
+STA $0600,X
+INX
+BNE cp
+LDX $F8
+LDA ENTL,X
+STA $0484
+LDA ENTH,X
+STA $0485
+LDA #0
+STA $0483
+LDA $00F9
+STA $0052
+JMP $0600`;
+const pgBytes=P=>P.reduce((a,l)=>a+l.length+1,0);
+// layout: <=20 entries: 1 column; more: 2 columns x 35 per page, extra pages beyond that
+function menuPages(title,labels,u){const n=labels.length,t=title.toUpperCase().slice(0,36),p=' '.repeat((40-t.length)>>1),W='BF loader v1.0',
+ c=[u[0]+'/'+u[1]+' SEC',u[0]+'/'+u[1]].find(x=>x.length+1+W.length<=39)||'',foot=c+' '.repeat(39-c.length-W.length)+W,
+ two=n>20,per=two?35:20,np=Math.max(1,Math.ceil(n/per)),P=[];
+ for(let g=0;g<np;g++){const L=[p+t,''],E=labels.slice(g*per,(g+1)*per).map((l,i)=>two?KEYS[i]+' '+l.toUpperCase().slice(0,17):'  '+KEYS[i]+'  '+l.toUpperCase().slice(0,30));
+  if(two){const r=Math.ceil(E.length/2);for(let i=0;i<r;i++)L.push((E[i].padEnd(20)+(E[r+i]||'')).trimEnd())}else L.push(...E);
+  const pr=two?22:Math.min(L.length+1,22);while(L.length<pr)L.push('');
+  L.push(np>1?'  <>:'+(LANG=='es'?'PAG ':'PAGE ')+(g+1)+'/'+np:'');while(L.length<23)L.push('');L.push(foot);P.push(L)}
+ return P}
+// files:[{name,bytes}], ents:[{label,file}] (file = object from files), returns ATR bytes
+const DOSDATA={d25:{t:'Atari DOS 2.5',boot:'AAMAB0AVTBQHA4MAzBkBBAB9ywesDgfwNSBfB60QB6wPB6YkjgQDpiWOBQMYIGwHMBysEQexJCkDqsgRJPARsSRIyLEkIFUHaKiKTCIHqcAKqGCpgBhlJIUkkALmJWCtEgeFJK0TB4UlYAAAjQsDjAoDqVKgQJAEqVeggAimIeAI0AcoIIEUTLkHKI0CA6kPjQYDjBcTqTGNAAOpA40JE6mAjQgDCo0JA60XE40DAyBZ5BAFzgkTEPCmSZhgIK0RIGQPIAQNTMcSAABkCI8KTQqPCbwHKguAQCAQCAQCAf+tDAeFJK0NB4UlrQoHhUOiB6kABkOQFaAFkSSlJJ0pE6UlnTETqZAgVQepZJ0ZE8oQ36UkjTkTpSWNOhOsCQeiAIiYnSETMAMgUwfo4AjQ8aUkjecCpSWN6AKpAKiZgRPIEPqouRoD8AzJRPAIyMjIwB7Q8ACpRJkaA6nLmRsDqQeZHANgIK0RIH0OvUoDnYITKQLwA0xyDSDsDgi9ghPJ',files:[['DOS.SYS','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'],['DUP.SYS','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']]},d2p:{t:'DOS II+',boot:'xAMAB/sSOLAoBAAEAB6BAQIDBAUGBwA7m1RBUlSbQVJUm1Sbm08gICAgVFhUIDAwm6mAoAcgYwep/YVFoASpACBxBzAVIFwHoACxQykDqsgRQ/AHsUOoihDmOGAYpESlQ2VFhUONBAOYaQCFRI0FA2CNCwOiUpAColCMCgOgA5iOAgONBgOMaBupMY0AA6mAoAAkRRACCsiNCAOMCQOpQK4CA+x5B9ABCo0DA60BA/BiIFnkEBStD9IpCPAFzmgb0NytXQ7wBUxdDqYYmGCZCKYKcQrCCRsL/gpEzgdNzgepAI1EAqiZAxvI0PqtCQfwBMkLkAWpBI0JB6iZdRsgahKN6AKM5wKgBbnaB5kpA4gQ92CpAIUwrgHTGKwKA60LAywOB3AbMAJpBIUymAomMjhqSoUxZjCkMooJ/DmOCNAYmKwLA/AC6WfJIJACaQ9KZjBpwIUxiin+eKAAjA7UjQHTrQQDhTKtBQOFM60DAxAIsTKRMMgQ+YixMJEyyBD5',files:[['DOS.SYS','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']]},myd:{t:'MyDOS 4.5',boot:'TQMAB+AHTBQHAwAB6BsBBAB9CgusEgetEwcgWAetEAesDwcYrg4H8B0gYwcwGKwRB7FDKf9IyBFD8A6xQ0ggTQdoqGiQ3anAoGgKqGCtEQcYZUOopURpAIRDhUSMBAONBQNgjQsDjAoDoAOpUpACqVCESI0CAxiMBgOpgMrwDa4LA9AHrgoD4ASQAQqNCAMqjQkDoDGMAAPGSDAWrgID6IqiQCkG0AKigI4DAyBZ5Igw5qYuyJhgEGkBAID2AAAAIyhQTQEBAQICAAAAUlLS0tLS0tJcDFwOYg3GDVAOZxCpaY24B6kBjbkHogiOAQMgtgu9ywcwEiCaC/ANvcsHyUCwBrzDByAkC8rQ4KCuiplVCIjQ+u5ZCK0MB43nAqwNB6IP7AkHkAXe3QgwBZid7QjIyhDujOgC6OjovRgD8ATJRND0qUSdGAOp1J0ZA6kHnRoDTHkaAAD/AQAAAAAAAAAAAAAAAAAAAAAAAAAAyIB9AAMEAAAAAABpAQAAAAAA',files:[['DOS.SYS','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'],['DUP.SYS','//9JKXZDRDM6RE9TLlNZU5sgbuSiACDcGgwDrhuOHAKOHQKgAakDjSoCIFzkrSoC0PtgGNii/4YRqQeFDanghQypAoVSqSeFU628Gw27BynByYDQAoUIqUANuweNuwepgAUQhRCNDtIgVCmtuwcpAfAlIAFDRXJyb3IgbG9hZGluZyBNRU0uU0FWIG9yIG1lbW9yeSGbAK0LBwkwjYgqohygCKkgnWEqnWIqnWMqnWQqzAoH0ASpUtAHuREL8AepSJ1jKtAcucMH8B1KqVOwAqlEnWMqucsHSqktkAKpPZ1kKpgJMJ1iKsrKysqI0LQgoT19TXlET1MgNC41My80LSBDb3B5cmlnaHQgMTk4OCzXz9LEzcHSy5tEaXNrcyAxUy0gMlMtIDNTLSA0RC0gNUQtICAgICAgICAgICAgm0Q6ID0gRDE6AKnAohsgiz0goT2bmzEtOC5EaXIgb2YgRDE6LUQ4OiAqLiBEaXIgb2YgRDqbQS4gRGlzayBEaXJlY3RvcnkgIEsuIFNhdmUgTWVtb3J5m0IuIFJ1biBDYXJ0cmlkZ2UgICBMLiBMb2FkIE1lbW9yeZtDLiBDb3B5IEZpbGUocykgICAgTS4gUnVuIGF0IEFkZHJlc3ObRC4gRGVsZXRlIEZpbGUocykgIE4uIExvYWQgTUVNLlNBVptFLiBSZW5hbWUgRmlsZShzKSAgTy4gQ2hhbmdlIENvbmZpZy6bRi4gTG9jayBGaWxlKHMpICAgIFAuIFNldCBEZW5zaXR5m0cuIFVubG9jayBGaWxlKHMpICBRLiBNYWtlIERpcmVjdG9yeZtILiBXcml0ZSBET1MgRmlsZXMgUi4gUGljayBEaXJlY3RvcnmbSS4gSW5pdGlhbGl6ZSBEaXNrIFMuIFNldCBSQU1kaXNrICObSi4gRHVwbGljYXRlIERpc2sgIFYuIFNldCBWZXJpZnkgRmxhZ5sgmwCsvxsQAyAUQKL/muiOuxuO8yiOvxsguhqiMCDCGiChPVNlbGVjdCBJdGVtICjSxdTV0s4gZm9yIG1lbnUpOgCpQI2+Ag27B427ByCxPcmb0BFM2inJMZADTOosySrQD0zgLMk6kO7JV7AE6UCwAqkWCqi5siyFGrmzLIUbTKc9Tm8gc3VjaCBpdGVtIZsATCksCy3gPKMvHi6xLtQt7i0YMn0xoTJDO3M8KT1GPKk53jX3Lhcv7DqfLJ8sBTufLI37KKk6jfoo0AiN+iipOo37KKkqjfwojf0oqUSN+Sipm43+KI3yKI04J9AoRmlsZXMgdG8gbGlzdCwgRGVzdGluYXRpb24/mwCpm43yKCDAQCC4Qqn5oCggyhqiEI7wKCCXQqkohdupwoXaqSaF3KkAhd2iAK04JzARMAkgykCMZAONZQOiIKkH0AKpBY7xKCAXP0wpLCABQ05lZWQgbmV3IGZpbGUgbmFtZSGbACABQ05vIGRyaXZlIG9yIGRpcmVjdG9yaWVzIGFsbG93ZWQgaW4gbmV3IG5hbWUhmwBMb2NrIABVbmxvY2sgAERlbGV0ZSAATG9jayB3aGljaCBmaWxlP5sAoL+iLakj0BpVbmxvY2sgd2hpY2ggZmlsZT+bAKDFoi2pJIz1KI72KEggwEAg3UGuuxvgUfAv0HdEZWxldGUgd2hhdCBmaWxlP5sAoM2iLakhjPUojvYoSCDAQCDdQa67G+BO8EogoT1BbnN3ZXIgJ1knIG9yICdOJ5sAaCCFQiB8P7A7rfUorvYoIIs9qfmiKCCLPSChPT8AILE9yVnQBaIgIA1ATGYuSCDAQCDdQWiNUgOiECANQK1SA8kp8ANMKSxMSS9Mji1Mdi1GaWxlIHRvIHJlbmFtZSwgbmV3IG5hbWU/mwAgwEAg3UGs6SitOCfJLPAEySDQzsix3sk68MTJPvDAyTCQBMl7kO2pINCfRnVsbCBkaXJlY3RvcnkgbmFtZT+bAKIIjloDqSJMjy5EaXJlY3RvcnkgdG8gYmUgdXNlZCBhcyAnRDonP5sAIMBAIN1BrOkowASQNakpTJcuogCt6ShJBPAfoAGpOtHe0AnovL8b0PqdvxvI8BPR3tD5yvAB6Mix3p3AG9D3TCksIAFDSW52YWxpZCBkaXJlY3RvcnkhmwBMFECiEI7wKCDcGgQD+Sgw70xlLUZpbGUgc291cmNlLCBkZXN0aW5hdGlvbj+bAKkgjYsnqZuN8iggwECpQ4XbqXeF2q3lAjjpd4XcreYC6UOF3SC4Qq04JzAFIMpAqQCN8ygGCKXfjWUDpd6NZAOt+SjJRNCNqfmgKCDKGqk/oAuZOCeI0PogAEKiECCXQqD/yLHemYkn0PiIsd7JOvAEyT7Q9ciM+Cix3vBDogCx3jBKySrwDckukELQA6kgiJ05J8jo4AiQ5six3vAvyS7w98kq8BrJIPAjySzwH8mb8BvInTkn6OALkN+wAyAAQiB8PyztKDD4kAdMKSypINDiqSeNdQOpiY10A6IArPgovTkn8DPJP9ADveommYknySDwAcjo4AiQ56kumYknyL05J/AUyT/QA73qJpmJJ8kg8AHI6OALkOepLtmIJ9ABiKmbrrsb4FHQAqk/mYknqQCZiiet8ijQI6n5oiggiz0goT0tLT4AqYmiJyCLPa27G8lR0AcgsT3JWdBSrV8DjW8DoiCO8CipBJ1KA6n5oCggzBqpAyDEGjA/oge9+ELdiyfQEcrQ9a2KJ43vQo1KKalgjYwnqSeNdQOpiY10A6IIjnoDojCO8SipByAXP63yKNADTHwwTCksTBRAqQHQbkRpc2sgdG8gRk9STUFUOgAgiUEguEKpKI1VA6n5jVQDoAGx3o3eMSChPShQcmVzcyDbwd0gZm9yIEVuaGFuY2VkIERucymbVHlwZSDb2d0gdG8gRm9ybWF0IERyaXZlIDc6ACCxPclB8JJJWdAfjVoDqQCuuxvgTtABao1bA6n+jVIDohAgVuQQA0wUQEwpLEQzOkRVUC5TWVObRHJpdmUgdG8gd3JpdGUgRE9TIGZpbGVzIHRvPwAgiUGtsRtIqTGNsRuNpBugAbHeyTrQA62IKo1KKY0PMoiMuxupgI27B6lJoCkgyhqpCI1aAyCcQiC9GmiNpBuNsRugcKlJoikgPzypMo1VA6kOjVQDqUOF2al2hdipGoXbqS6F2qkAheBM6jtTb3VyY2UsIERlc3RpbmF0aW9uIChTZWN0b3JzKT+bACCJQaABsd4pD43wKI3xKK04J8ko8BYgg0GgAbHeKQ+N8SjN8CjQBaKbjvMoqqzwKK3zKAlAjfMoMCUgoT1JbnNlcnQgYm90aCBkaXNrcywgdHlwZSDSxdTV0s4AILE9IABCrfAoILlBrPEorvAovcMH2cMH8C+M6CggREKs8Siu8Ci9wwfZwwfwGyABQ0RyaXZlcyBub3QgY29tcGF0aWJsZSGbAAYISo32KGqN9SiOAQOtOCdIqf+qnWgnnegnytD3aMko8BnJm/B5IAFDSW52YWxpZCBvcHRpb25zIZsAIE5AwC3Q5I3rJo7sJiBOQMAp0NeN6SaO6iagAIzpKIzuJoztJqkmhdup8oXaqf6u7ibs7CbQCK7tJuzrJrAHOCogODTQ6a7qJuzuJpAQ0Aiu6Sbs7SaQBgogODTQ6DgqsPyR2jit5QLt9SiF3K3mAu32KIXdpdzJd6Xd6UOwLCABQ05vdCBlbm91Z2ggbWVtb3J5IZsAsAqR2qn+5trQAubb7u0m0APu7iZgreko8E2paKIBjQoDjgsDqeiiJo0EA44FAyABPhADTBRAGK3pJmkMjekmkAPu6iat6CbJBJAc7ukmGK0EA20IA40EA60FA20JA40FA84KAyABPqkAjQsDqQGNCgOt8iaN7SipCI3rKKkmhdWp8oXUpdSN6iil1Y3pKK3rKI3sKK3tKI2/G60KA43uKK0LA43vKKkAjfIoqUONBQOpd40EAw7tKM7rKNAS5tTQAubVoACx1I3tKKIIjusoLO0oMCKt8igKrfAokAOt8SggBT4YrQQDbfUojQQDrQUDbfYojQUDrQoDzekmrQsD7eomkAit8igQIkwpLO4KA9AD7gsDpdzNBAOl3e0FA7CVrfIoEAYgAEJMvDQs8ygQLCChPUluc2VydCBERVNUSU5BVElPTiBkaXNrLCBwcmVzcyDSxdTV0s4AILE9qU7NuxvwHI27G6IgqUmgKSDMGqn+jWIDrfEoCTCNSikgDUDO8iit6iiF1K3pKIXVre4ojQoDre8ojQsDrewojesorb8bje0oTOM0RHJpdmUsIG5ldyBkZW5zaXR5OgAgiUGtOCfJm9AVIAFDRHJpdmUgdW5jaGFuZ2VkLpsArOkosd6qoAGx3sk5sN3pMJDZqMiM6CipAeBT8AXgRNDKCpnDByBxQkzaKXigAIwO1IwO0q0B00ii/4wB060AQJn9CI4AQIqZ/QnI0O3KjgHThgCOAECOAICOAMCiAIwB060AQMn/0AXojgBAipn9CcjQ6446DKIBiqD/2f0J8CSIwP/Q9uqMAdO5/QiNAECIwP/Q8miNAdOpwI0O1KUQjQ7SWGCYnbkL6OBBkMug/tDVIKE9UkFNIGRpc2sgcHJlc2VudD8AILE9oP/JTtADTDA4IKE928HdeGxvbiBvciDb2N1FIHR5cGUgUkFNZGlzaz8AILE9oAGi08lB0ASg/6LPjA0MjBkMjEwMjg4MjhoMjk0Mov+OFAyiAI4QDMlB8DGifI4UDCA9Nq06DNAnIKE9Tm8gZXh0cmEgbWVtb3J5IGF2YWlsYWJsZSGbAKAATDA4TMc3ov+OEAyiAIbVCgom1Qom1QqF1CbVIKrZIObYIKE9VXNlIGRlZmF1bHQgY29uZmlnIGZvciAAoACx8zADyND5KX+R88ipAJHzpfOm9CCLPSChPUs/ACCxPclO8ANMCjggoT1TaXplKEspPwAg7D8gTkBG1WpG1WpG1WpG1WrQAqkEjToMIKE9UGFnZSBzZXF1ZW5jZT8AIOw/IFBAwJvQb/AqIKE9UkFNIGRpc2sgZHJpdmUgbm8/ACCxPaAJyTCQB8k5sAMpD6iMCgdgqL4EOY4QDMADsC25CjmiACoqSCoqKikMqLkQOZ26C+jIiikD0PNo4BDQ5b0QOZ26C+jgQND18J6iQIqduQvK0Pnwk6IASIqd6Cfo0PpojugowJvwI52oJ6q96CfQL97oJ6zpKLHeyZvQAyDsPyBQQK7oKOjgQNDW7DoM0DONEAzKvagnnboLitD2TAo4IKE9RHVwbGljYXRlZCBzZXF1ZW5jZSBudW1iZXIhmwBM7DcgoT1Xcm9uZyBudW1iZXIgb2YgZW50cmllcyGbAEzsN////wAAAJzYS///AKOnq6/Dx8vP4+fr74OHi4+hpamtwcXJzeHl6e2BhYmNoqaqrsLGys7i5urugoaKjqCkqKzAxMjM4OTo7ICEiIwgoT1WZXJpZnkgV1JJVEVzPwAgGzsgoT1OdW1iZXIgb2YgRmlsZSBCdWZmZXJzPwAg7D8gTkCq8AfJEbADjQkHIMM2IOAHTHYpqdIsqVKs6CiZywcgNDtMKSxEcml2ZSBudW1iZXIgb3Ig0sXU1dLOOgAgsT3Jm9ADTFA5yTmQA0z9NekwkPmoyIzoKKkAmcsHIKE9UmVtb3ZlIGRyaXZlPwAgsT3JWfCgIKE9SXMgZHJpdmUgY29uZmlndXJhYmxlPwAgsT3JWdCCIKE9SGlnaCBjYXBhY2l0eSBkcml2ZT8AILE9yVnweSChPUlzIGRyaXZlIGRvdWJsZSBzaWRlZD8AILE9yVnQBakBICo7IKE9VHJhY2tzL3NpZGU/ACDsPyBOQMkj8BaoqTDATfAMqSDAUPAGqRDAKNDTICo7IKE9U3RlcCByYXRlPwAgsT3JNLDr6S+Q5wogKjsgNDtMKSwgoT1Ecml2ZSBzaXplIChpbiBzZWN0b3JzKT8AIOw/IE5A4ADw2kis6CipEpnLB6kCmcMHaCA3O0wpLFJBTSBkaXNrIGRyaXZlIG5vPwAgIDhMKSxWZXJpZnkgV1JJVEVzPwAgGztMKSwgsT2iV8lO0AKiUI5wB2Cs6CgZyweZywdgogCKrOgomQkLipkRC0xxQlNBVkU6ZmlsZW5hbWUsc3RhcnQsZW5kKCxpbml0KCxydW4pKZsAIMBAjFQDjVUDrbsbSCBQQOBDoHCwAqBgID88IFBAhdiG2Tjl1oXaiuXXEB0gAUNJbnZhbGlkIFNUQVJULUVORCByYW5nZSGbAIXb5trQAubbqQDAm/AQIFBAjeICjuMCDeMC8AKpAYXgwJvwEiBQQI3gAo7hAg3hAvAE5uDm4GigAIy7G4iE1ITVoAjJQdAEzrsbyIxaA6IQIJxCMDStuxvwKiDeGhAEAAvWADAkpdqNWAOl241ZA6XWjVQDpdeNVQMsuwcwA0wQQ0wNQyBIQxDcTBRAhdaG14y7B2BMb2FkIE1FTS5TQVYgZnJvbSB3aGF0IGZpbGU/mwCtuwcJgDAjTCksoLRMFEBMb2FkIGZyb20gd2hhdCBmaWxlP5sArbsHKX+NuwcgwECMVAONVQOu6ybwzKkEjVoDohAgnEIg3hoQAgAH6CYwvK3oJi3pJsn/0LCt6ybwqK27G0lO8AapAIUIqQNJB41aA6knjVIDqVai5NAwAK39v0mqjf2/zf2/0BdJqo39vyABQ05PIENBUlRSSURHRSGbAK78v9Dprfq/rvu/hdSG1a29G4UMrb4bhQ2tuwcpv427B0w+G1J1biBmcm9tIHdoYXQgYWRkcmVzcz8AIOw/sd7Jm/ANIFBAwJvQBqAAhAjwuiABQ0FkZHJlc3MgbXVzdCBiZSAxLTQgaGV4IGRpZ2l0cyGbAKILjkIDogCOSAOOSQNMVuSFGoYbogChGvALIHs95hrQ8+Yb0O9gaIUaaIUbIJg9pRtIpRpIYCDXPcAAMBnJe7AGyWGQAukgSMmb8AUgez2pmyB7PWhgIHs9TCksIPc9INwaBAP0PSDeGnAAAAcAAEiYSCD3PWioaGBLOpsg3hpwAAAMAABgrfAoGI0BA6kCjfQoCK72KOgoCCBpBxANyYDwBc70KBDsKEwUQChgrvAovUIDyQfwRK3CKMkwsD68SAPAFJAO3kgDoOi56CeZ5yfI0PetiT5JF42JPoVVrYg+SbuNiD7Jm/APrdMoyZvQBakgjdMorYg+jdQoYKmbzYg+8PjeRAP+SAONwShgmxWu8Ci9SAMdSQPwYK3zKBAQqWuiNSCLPSCxPa7xKCA1Qq7xKNAFICg+ogC9QAMQFq67G6kI4EHQAqkJrvEonUoDIJxCMH2u8Sis8Ci5SAOdSAO5SQOdSQO5RAOdRAO5RQOdRQOpC51CAyANQK7wKL1DA8mI8FCt8ygQI6kJokIgiz0gsT2u8CggNUJMJz+u8CidQgOpm42IPqkVjYk+rvAoqQCN1yil2qTbIMwapdydSAOl3Z1JAyBW5BAEwIjQA0yKPkwUQK7xKPAiIMIare9C8Bog3BoAIe5CINwaCANJKSDcGgAMAACpAI3vQq7wKEzCGqnooCYgyhqpBY1SA6kgjVgDqQCNWQON7SggDUCt6SbJOrAEyTCwSPAIrfImzb8b0APO7Siu9yigArnoJskg8Amd+SjoyMAKkPCpLp35KOigCrnoJskg8Amd+SjI6MANkPCpLt34KNAByqkAnfkoGGCp64XejUQDqSaF341FA6kFjUIDogGOSQPKjkgDoACM6SggVuSYMAFghNSpAIXVIKrZIObYoACx841BQMix841CQMix8yl/jUNAIAFDRXJyb3IgLS0gMTYwmwCs6ybAm9ADYBgkOGbhIGNBhNSE1bHeyMlHsBPpL5AMyQok4RASkDzJEbA2OGkvjOkoqKXUptVgsPJIBtQm1aXUptUG1CbVBtQm1Rhl1IXUaAgYZdSF1Ipl1ShpAIXVTFpA6QcG1CbVBtQm1QbUJtUG1CbVBdSF1ExaQKkAje9CIOw/8AMgY0Gx3sjJP/AEySrQB6kAjfIo8O7Jm/A6yS7w5skvkDLQ4LHeyVPQBY2/G/AOyVjQB6mAjfMoMAONuxuIqQCR3sjIsd7IyS/w2ckukAXJm/ABiIzpKIix3o04J6kAkd6osd7JMJAjyTrwH8iwDaqpOtHe8BqIkd6K0BGx3vALyTrwEcix3sk68AqpOiBzQalEIHNBpN6l32AYrekoZd6F3qkAqGXfhd9gpN7QAsbfxt7u6SigAJHeYCDKQEyMQSDAQIxUA41VA6D/yKqx3tD64Drw5CABQ0ZpbGUgbmFtZSBub3QgYWxsb3dlZCGbAMk60AOtCwcpD6IAjgsD6I4KA6JojgQDoiiOBQMgBD4wK0yaC4xUA41VA6AAsd7JRPAaIAFDTm90IGEgZGlzayBmaWxlIZsArfMoMAFgIKE9SW5zZXJ0IFNPVVJDRSBkaXNrLCBwcmVzcyDSxdTV0s4AILE9LPMocNOu8Ci8QQOM6Ci9TwPwIMkDsByZwweiD739CJ1hQsoQ9yBxQqIPvWFCnf0IyhD3YEJGAAQARE9TICAgICBTWVOiMY4AA67oKI4BA7zDB73LB0wkC41iA6n5oiiNZAOOZQMg00KiEKkGnUoDqQCdSwOdTwOpAyDEGhADTBRArAEDucMHnU8DYCDTQrHe0BON8iiZ+yipKpn5KJn6KKmbmfsoYKD/yLHemfko0PiIufkoyTrwBMk+0PTIjPcoYEQAOmBPUy5TWVMsRE9TLlNZUwBohRpohRsgmD1MKSwghxuiECBW5BADTEkbouIgL0Oi4CAvQyy7B3ADTGgbTH4bRuCQI4bUvQAChdjovQAChdmpAoXVhdeG1iDeGhAGAAvUABADTBdDYJtEYXZpZCBSLiBFaWNoZWwgcmVsLnZlci4xLzEvOTCb']]},};
+const unb64=x=>Uint8Array.from(atob(x),c=>c.charCodeAt(0));
+// DOS needs: Atari DOS 2.5 = 128-byte sectors, 720 or 1040 sectors; DOS II+ = 256-byte sectors, up to 1024; MyDOS 4.5 = 128-byte sectors. All need 3 boot sectors.
+function dosErr(k,g){if(!k)return'';const bad=k=='d25'?!(g.SS==128&&(g.N==720||g.N==1040)):k=='d2p'?!(g.SS==256&&g.N<=1024):!(g.SS==128&&g.N>=720);
+ return g.bs!=3?'DOS needs 3 boot sectors':bad?DOSDATA[k].t+(k=='d25'?' needs SD (720 × 128) or MD (1040 × 128)':k=='d2p'?' needs 256-byte sectors (DD, up to 1024 sectors)':' needs 128-byte sectors (720 sectors or more)'):''}
+function applyDos(k){const d=DOSDATA[k],e=dosErr(k,G);if(e)throw e;const bt=unb64(d.boot);for(let i=0;i<3;i++)D.set(bt.subarray(i*128,i*128+128),off(i+1));
+ for(const[n,b]of d.files){const s=addFile(n,unb64(b));if(!s)throw err;if(n=='DOS.SYS'&&s!=4)throw'DOS.SYS could not be placed at sector 4'}}
+function buildPlainATR(files){const dk=$('#dos').value;
+  if(!files.length&&!dk)throw'Drop at least one file first (or choose a DOS).';
+  if(base){D=new Uint8Array(base.bytes);G=base.G}else{newDisk(fm());if(dk)applyDos(dk)}
+  for(const f of files){if(f.ex)continue;const s=addFile(f.name,f.bytes);if(!s)throw err;}
+  return new Uint8Array(D);
+}
+function buildATR(files,ents,title,hue,tl=7,inv=false){
+ if(!files.length)throw'Drop at least one file first.';if(!ents.length)throw'Add at least one menu entry.';if(ents.length>MAXE)throw'Max '+MAXE+' menu entries.';
+ if(base){D=new Uint8Array(base.bytes);G=base.G}else newDisk(fm());const st=new Map(),X={MASK:G.wide?255:3,SZLO:G.SS&255,SZHI:G.SS>>8};
+ for(const f of files){const s=f.ex?f.st:addFile(f.name,f.bytes);if(!s)throw err;st.set(f,s)}
+ const n=ents.length,np=Math.max(1,Math.ceil(n/(n>20?35:20))),labels=ents.map(e=>e.label),tot=totalSec(G),
+  mu=Math.ceil((0x480+menuPages(title,labels,[0,0]).reduce((a,P)=>a+pgBytes(P),0))/G.DB),A=s=>[...s].map(c=>c.charCodeAt(0)&255),
+  PG=menuPages(title,labels,[tot-(sync()-mu),tot]).map(P=>[0x7D,...P.flatMap((l,i)=>[...A(l),...(i<P.length-1?[0x9B]:[])])]);
+ const code=asm(0x3000,menuSrc(np>1),{KN:0x3300,KEYS:0x3310,NXT:0x3340,PRV:0x3348,PAL:0x3350,PAH:0x3358,PLL:0x3360,PLH:0x3368,ENTL:0x3380,ENTH:0x3400,LDR:0x3200,N:n,KCNT:Math.min(35,n),PERP:35,NPM1:np-1,LASTB:(np-1)*35,BG:hue*16+(inv?tl*2:2),TXL:inv?2:tl*2}),
+  ldr=asm(0x600,LOADER,{...X,BUF:G.buf,BUFH:G.buf>>8,LB0:G.buf+G.DB,LB1:G.buf+G.DB+1,LB2:G.buf+G.DB+2});
+ if(code.length>512||ldr.length>256)throw'Internal: code too large ('+code.length+'/'+ldr.length+')';
+ const img=new Uint8Array(0x480+PG.reduce((a,b)=>a+b.length,0));img.set(code,0);img.set(ldr,0x200);img.set([0x4B,0x3A,0x9B],0x300);img.set(A(KEYS),0x310);
+ img.set([0x2E,0x3E,0x20,0x1F,0x2B],0x340);img.set([0x2C,0x3C,0x1E,0x2D],0x348);
+ let a=0x3480,o=0x480;PG.forEach((b,g)=>{img[0x350+g]=a&255;img[0x358+g]=a>>8;img[0x360+g]=b.length&255;img[0x368+g]=b.length>>8;img.set(b,o);o+=b.length;a+=b.length});
+ ents.forEach((e,i)=>{const s=st.get(e.file);img[0x380+i]=s&255;img[0x400+i]=s>>8});
+ const s2=addFile('MENU.SYS',img);if(!s2)throw err;
+ const boot=[0,3,0,7,6,7,...asm(0x706,BOOT,{...X,S2LO:s2&255,S2HI:s2>>8,LK:G.DB})];if(boot.length>384)throw'Boot too large';
+ for(let k=0;k<3;k++)D.set(boot.slice(k*128,k*128+128),off(k+1));return{atr:D,free:sync(),sizes:[code.length,ldr.length,boot.length]}}
+const $=s=>document.querySelector(s);
+// ---- interface language (English default / Spanish): exact strings, one regex, then phrase fragments ----
+const EX={'1 · Files → ATR':'1 · Archivos → ATR','2 · Disk menu':'2 · Menú del disco','New disk format':'Formato de disco nuevo','Sectors':'Sectores','Boot sectors':'Sectores de arranque','Sector size':'Tamaño de sector',
+'…or drop an existing .ATR to jump straight to the menu':'…o suelta un .ATR existente para ir directo al menú','Drop .XEX / .BIN / .COM files here, or click to choose':'Suelta aquí archivos .XEX / .BIN / .COM, o haz clic para elegir',
+'Drop an .ATR image to build a menu for the files already on it':'Suelta una imagen .ATR para crear un menú con los archivos que ya contiene','Clear':'Limpiar','No DOS':'Sin DOS','Export ATR without menu':'Exportar ATR sin menú','Next: build menu →':'Siguiente: crear menú →',
+'Order':'Orden','Manual':'Manual','Alphabetical A → Z':'Alfabético A → Z','Alphabetical Z → A':'Alfabético Z → A','+ Entry':'+ Entrada','← Back to files':'← Volver a archivos','Build bootable ATR ↓':'Crear ATR de arranque ↓','◀ Prev':'◀ Anterior','Next ▶':'Siguiente ▶',
+'Background color':'Color de fondo','Text contrast':'Contraste del texto','Invert colors':'Invertir colores','Custom geometry…':'Geometría personalizada…','Download':'Descargar','Delete from ATR':'Eliminar del ATR','Menu title':'Título del menú','label':'etiqueta',
+'Keys 1–9, A–Z start the program; with several pages flip with , . (or < >), + −, SPACE or the arrow keys. Disk boots straight into the menu (no DOS needed).':'Las teclas 1–9, A–Z inician el programa; con varias páginas, cambia con , . (o < >), + −, ESPACIO o las flechas. El disco arranca directo al menú (no necesita DOS).',
+'Adds a bootable DOS (from your reference disks) to the ATR exported without a menu. Not used when building a menu.':'Añade un DOS de arranque (de tus discos de referencia) al ATR exportado sin menú. No se usa al crear un menú.',
+'On the Atari the text hue follows the background; this sets the text contrast (brightness)':'En el Atari el tono del texto sigue al fondo; esto ajusta el contraste (brillo) del texto',
+'Swap text and background brightness (hue stays the same)':'Intercambia el brillo del texto y del fondo (el tono no cambia)'};
+const RX=[[/^Unsupported sector size (\d+) in (.+) \(need 128 or 256\)$/,'Tamaño de sector no soportado $1 en $2 (se requiere 128 o 256)']];
+const FR=[['100% offline · bootable without DOS','100% sin conexión · arranca sin DOS'],['Not a valid ATR image: ','Imagen ATR no válida: '],['Unsupported or truncated disk geometry in ','Geometría de disco no soportada o truncada en '],
+['No DOS 2 / MyDOS file system found in ','No se encontró un sistema de archivos DOS 2 / MyDOS en '],['Empty file: ','Archivo vacío: '],['Disk full while adding ','Disco lleno al añadir '],['Directory full (','Directorio lleno ('],[' files max)',' archivos máx.)'],
+['DOS.SYS could not be placed at sector 4','No se pudo colocar DOS.SYS en el sector 4'],['Drop at least one file first (or choose a DOS).','Suelta al menos un archivo primero (o elige un DOS).'],['Drop at least one file first.','Suelta al menos un archivo primero.'],
+['Add at least one menu entry.','Añade al menos una entrada de menú.'],['Add at least one file.','Añade al menos un archivo.'],['Max ','Máximo '],[' menu entries.',' entradas de menú.'],[' entries.',' entradas.'],
+['Loaded ','Cargado '],[' (previous ATRmenu menu replaced)',' (menú ATRmenu anterior reemplazado)'],[' of ',' de '],[' files added as menu entries',' archivos añadidos como entradas del menú'],
+[' (non-XEX and DOS files skipped; add them with + Entry)',' (archivos no XEX y de DOS omitidos; añádelos con + Entrada)'],['“Clear” unloads it.','“Limpiar” lo descarga.'],[' free sectors',' sectores libres'],[' · menu ~',' · menú ~'],
+['need more space — delete files','falta espacio: elimina archivos'],['OK to build','Listo para crear'],['Deleted ','Eliminado '],['Could not locate ','No se encontró '],['Downloaded ','Descargado '],
+['Warning: need ~','Aviso: se necesitan ~'],[' sectors, ',' sectores, '],[' free. Delete files or remove entries before building.',' libres. Elimina archivos o quita entradas antes de crear.'],
+['Exported ATR without menu – ','ATR exportado sin menú – '],[' files included',' archivos incluidos'],['Built disk image – ','Imagen de disco creada – '],['. Boot it in Altirra or on a drive.','. Arráncala en Altirra o en una unidad.'],
+[' entries – ',' entradas – '],[' pages, 2 columns each',' páginas, 2 columnas cada una'],['2-column layout','diseño de 2 columnas'],['. Labels are cut to 17 characters.','. Las etiquetas se recortan a 17 caracteres.'],['Page ','Página '],
+[' sectors used (incl. ',' sectores usados (incl. '],[' for the menu) – ',' para el menú) – '],[' — TOO BIG, remove files or pick a bigger format',' — DEMASIADO GRANDE: quita archivos o elige un formato mayor'],[' takes ',' ocupa '],
+[' sectors (export without menu)',' sectores (exportar sin menú)'],['Custom · ','Personalizado · '],[' boot sectors)',' sectores de arranque)'],['enhanced','densidad ampliada'],[' · system',' · sistema'],[' ⚠ not XEX',' ⚠ no XEX'],[' · on disk',' · en el disco'],
+['DOS needs 3 boot sectors','DOS necesita 3 sectores de arranque'],[' needs SD (720 × 128) or MD (1040 × 128)',' necesita SD (720 × 128) o MD (1040 × 128)'],[' needs 256-byte sectors (DD, up to 1024 sectors)',' necesita sectores de 256 bytes (DD, hasta 1024 sectores)'],
+[' needs 128-byte sectors (720 sectors or more)',' necesita sectores de 128 bytes (720 sectores o más)']].sort((a,b)=>b[0].length-a[0].length);
+const tr=x=>{if(LANG!='es')return x;if(x in EX)return EX[x];for(const[r,y]of RX)if(r.test(x))return x.replace(r,y);return FR.reduce((a,[e,y])=>a.split(e).join(y),x)};
+const say=t=>$('#st').textContent=tr(t);
+const fillFmt=()=>{const cur=$('#fmt').value||'sd';$('#fmt').innerHTML=Object.entries(FMT).map(([k,v])=>`<option value="${k}">${tr(v.t)}</option>`).join('')+`<option value="custom">${tr('Custom geometry…')}</option>`;$('#fmt').value=cur};
+function applyLang(){document.documentElement.lang=LANG;
+ const w=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,{acceptNode:n=>{const e=n.parentElement;return e&&!e.closest('script,style,#pv,#ents,#fl,#cap,#ld,#st,#pg,#fmt,#lang')&&n.textContent.trim()?1:2}});
+ for(let n;n=w.nextNode();){const o=n.__en??(n.__en=n.textContent),k=o.trim();n.textContent=o.replace(k,()=>tr(k))}
+ document.querySelectorAll('[title],[placeholder]').forEach(e=>{if(e.id=='lang')return;for(const a of['title','placeholder'])if(e.hasAttribute(a)){const o=e['__'+a]??(e['__'+a]=e.getAttribute(a));e.setAttribute(a,tr(o))}});
+ $('#lang').textContent=LANG=='es'?'English':'Español';fillFmt();r1();if(!$('#p2').hidden){r2();pv()}$('#st').textContent=''}
+
+let files=[],ents=[],base=null;const cc={};
+const geo=()=>{if(base)return base.G;const f=fm();return gOf(f.SS,f.N,f.bs)};
+const cap=()=>{if(base)return base.free;const f=fm(),k=JSON.stringify([f.N,f.SS,f.bs]);if(!(k in cc)){newDisk(f);cc[k]=sync()}return cc[k]};
+const menuBytes=L=>0x480+menuPages('X',L,[0,0]).reduce((a,P)=>a+pgBytes(P),0);
+const menuSec=()=>Math.ceil(menuBytes((ents.length?ents.map(e=>e.label):files.map(f=>f.name.replace(/\..*/,''))).slice(0,MAXE))/geo().DB)+1;
+const need=()=>files.reduce((a,f)=>a+(f.ex?0:Math.ceil(f.bytes.length/geo().DB)),0)+menuSec();
+function dl(n,b){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([b]));a.download=n;a.click()}
+function loadATR(name,b){
+ if(b.length<400||b[0]!=0x96||b[1]!=2)return'Not a valid ATR image: '+name;
+ const SS=b[4]|b[5]<<8,t=(b[2]|b[3]<<8|b[6]<<16)*16;
+ if(SS!=128&&SS!=256)return'Unsupported sector size '+SS+' in '+name+' (need 128 or 256)';
+ const N=SS==128?t/128:3+(t-384)/SS;
+ if(!Number.isInteger(N)||N<720||b.length<16+t)return'Unsupported or truncated disk geometry in '+name;
+ D=b.slice(0,16+t);G=gOf(SS,N);
+ if(D[off(360)]<2||D[off(360)]>5)return'No DOS 2 / MyDOS file system found in '+name;
+ const old=list().find(e=>e.name=='MENU.SYS');if(old)delFile(old);
+ const fl=list().map(e=>({name:e.name,ex:1,st:e.st,cnt:e.cnt,o:e.o,bin:e.st>3&&e.st<N&&D[off(e.st)]==255&&D[off(e.st)+1]==255}));
+ base={name,bytes:D,G,old:!!old,free:sync()};files=[...fl,...files.filter(f=>!f.ex)];ents=[];return''
+}
+async function take(fs){let atr=0;for(const f of fs){const b=new Uint8Array(await f.arrayBuffer());
+ if(/\.atr$/i.test(f.name)){const m=loadATR(f.name,b);if(m)say(m);else atr=1;continue}
+ let n=f.name,k=2;while(files.some(x=>fixName(x.name).join('.')==fixName(n).join('.'))){const[a,e]=fixName(f.name);n=a.slice(0,7)+(k++)+'.'+e}files.push({name:n,bytes:b})}
+ r1();if(atr){toMenu();if(!$('#p2').hidden)say('Loaded '+base.name+(base.old?' (previous ATRmenu menu replaced)':'')+' – '+ents.length+' of '+files.length+' files added as menu entries'+(ents.length<files.length?' (non-XEX and DOS files skipped; add them with + Entry)':'')+'.')}}
+const dosNote=g=>{const k=$('#dos').value;if(!k||base)return'';const e=dosErr(k,g);return e?' · ⚠ '+e:' · '+DOSDATA[k].t+' takes '+DOSDATA[k].files.reduce((a,[,b])=>a+Math.ceil(unb64(b).length/g.DB),0)+' sectors (export without menu)'};
+function r1(){const g=geo(),C=cap();
+ $('#fl').innerHTML=files.map((f,i)=>{
+  if(f.ex){const sys=/^(DOS|DUP|AUTORUN|MENU)\./i.test(f.name)||/\.(SYS|SUP)$/i.test(f.name);const tag=f.bin?'':tr(sys?' · system':' ⚠ not XEX');
+    return `<div class="er"><input value="${f.name.replace(/"/g,'&quot;')}" disabled><small style="width:auto">${f.cnt} sec${tag}${tr(' · on disk')}</small><button data-dl="${i}" title="${tr('Download')}">↓</button><button data-rmdisk="${i}" title="${tr('Delete from ATR')}">✕</button></div>`}
+  return `<div class="er"><input data-i="${i}" value="${f.name.replace(/"/g,'&quot;')}"><small>${f.bytes.length} B</small><button data-dl="${i}" title="${tr('Download')}">↓</button><button data-rm="${i}">✕</button></div>`
+}).join('');
+ $('#fmtrow').hidden=!!base;$('#dos').disabled=!!base;$('#ld').hidden=!base;if(base)$('#ld').textContent=tr('Loaded '+base.name+' · '+g.N+' × '+g.SS+' B'+(g.ed?' (enhanced)':'')+' · '+base.free+' free sectors. “Clear” unloads it.');
+ const n=need(),p=Math.min(100,n/C*100);$('#bar').className='bar'+(n>C?' bad':'');$('#bar i').style.width=p+'%';
+ if(base){$('#cap').textContent=tr(base.free+' free sectors · menu ~'+menuSec()+' · '+(n>C?'need more space — delete files':'OK to build'))}else{$('#cap').textContent=tr(n+' / '+C+' sectors used (incl. '+menuSec()+' for the menu) – '+fm().t+dosNote(g)+(n>C?' — TOO BIG, remove files or pick a bigger format':''))}}
+$('#fl').addEventListener('input',e=>{files[+e.target.dataset.i].name=e.target.value;});
+$('#fl').addEventListener('click',e=>{
+  const t=e.target;
+  if(t.dataset.rm!=null){files.splice(+t.dataset.rm,1);r1();return}
+  if(t.dataset.rmdisk!=null){
+    const i=+t.dataset.rmdisk,f=files[i];if(!f||!f.ex)return;
+    const entry=list().find(e=>e.name===f.name||(e.st===f.st&&e.cnt===f.cnt));
+    if(entry){delFile(entry);base.bytes=D;base.free=sync()}
+    files.splice(i,1);ents=ents.filter(e=>e.file!==f);r1();
+    say('Deleted '+f.name+' · '+base.free+' free sectors.');return}
+  if(t.dataset.dl!=null){
+    const i=+t.dataset.dl,f=files[i];if(!f)return;
+    let bytes;if(f.ex){const entry=list().find(e=>e.name===f.name||(e.st===f.st&&e.cnt===f.cnt));if(!entry){say('Could not locate '+f.name);return}bytes=extractFile(entry)}else bytes=f.bytes;
+    dl((f.name.replace(/[^\w.\-]+/g,'_')||'file.bin'),bytes);say('Downloaded '+f.name+' ('+bytes.length+' bytes).')}
+});
+$('#drop').onclick=()=>$('#fi').click();$('#fi').onchange=e=>{take(e.target.files);e.target.value=''};
+addEventListener('dragover',e=>{e.preventDefault();$('#drop').classList.add('hv')});addEventListener('dragleave',()=>$('#drop').classList.remove('hv'));
+addEventListener('drop',e=>{e.preventDefault();$('#drop').classList.remove('hv');take(e.dataTransfer.files)});
+$('#clr').onclick=()=>{files=[];ents=[];base=null;r1()};
+function step(n){$('#p1').hidden=n!=1;$('#p2').hidden=n!=2;$('#s1').className=n==1?'on':'';$('#s2').className=n==2?'on':'';say('')}
+function toMenu(){if(!files.length)return say('Add at least one file.');
+ const sys=/^(DOS|DUP)\.SYS$/i;ents=ents.filter(e=>files.includes(e.file));files.filter(f=>!ents.some(e=>e.file==f)&&(!f.ex||(f.bin&&!sys.test(f.name)))).forEach(f=>ents.push({label:f.name.replace(/\..*/,''),file:f}));ents=ents.slice(0,MAXE);sortEnts();
+ const menuNeed=Math.ceil(menuBytes(ents.map(e=>e.label))/geo().DB)+1;
+ const newNeed=files.reduce((a,f)=>a+(f.ex?0:Math.ceil(f.bytes.length/geo().DB)),0);
+ if(menuNeed+newNeed>cap())say('Warning: need ~'+(menuNeed+newNeed)+' sectors, '+cap()+' free. Delete files or remove entries before building.');
+ step(2);r2();if(ents.length>20)say(ents.length+' entries – '+(ents.length>35?Math.ceil(ents.length/35)+' pages, 2 columns each':'2-column layout')+'. Labels are cut to 17 characters.')}
+$('#nx').onclick=toMenu;fillFmt();
+const syncFmt=()=>{const c=$('#fmt').value=='custom';if(!c){const f=FMT[$('#fmt').value];$('#cn').value=f.N;$('#cb').value=3;$('#cs').value=f.SS}['#cn','#cb','#cs'].forEach(x=>$(x).disabled=!c)};
+$('#fmt').onchange=()=>{syncFmt();r1()};['#cn','#cb','#cs','#dos'].forEach(x=>{$(x).oninput=$(x).onchange=r1});syncFmt();
+$('#bk').onclick=()=>{step(1);r1()};
+function r2(){$('#ents').innerHTML=ents.map((e,i)=>`<div class="er"><b>${ents.length>35?((i/35|0)+1)+'·':''}${KEYS[i%35]}</b><input data-i="${i}" value="${e.label.replace(/"/g,'&quot;')}" maxlength="30" placeholder="${tr('label')}"><span class="fn" title="${e.file.name.replace(/"/g,'&quot;')}">${e.file.name}</span><button data-up="${i}">↑</button><button data-dn="${i}">↓</button><button data-rm="${i}">✕</button></div>`).join('');pv()}
+// GTIA colour -> RGB for the preview. Text hue always equals the background hue on the Atari (only luminance differs).
+// "alt": linear luma, no extra gamma, chroma 0.25, 24° hue steps starting at 340° on the YIQ wheel (hue 1 gold ... 5 purple, 7-8 blue, 12 green).
+// "a800": Atari800 NTSC model (CGIA luma table, gamma 2.35). "file": a 768-byte .act/.pal palette loaded by the user (exact).
+// GTIA colour -> RGB for the preview (Altirra-like NTSC: linear luma, chroma 0.25, 26.8° hue steps, hue 1 at 3°).
+// The Atari text hue always equals the background hue; only luminance differs.
+const ac=(h,l)=>{const y=l/15,a=(363+(h-1)*26.8)*Math.PI/180,k=h?.25:0,i=Math.cos(a)*k,q=Math.sin(a)*k,f=x=>Math.round(Math.max(0,Math.min(1,x))*255);
+ return`rgb(${f(y+.9563*i+.621*q)},${f(y-.2721*i-.6474*q)},${f(y-1.107*i+1.7046*q)})`};
+function fit(){const e=$('#pv'),W=e.clientWidth;if(!W)return;const cw=W*.857/40,fs=cw*1.12;
+ Object.assign(e.style,{padding:W*.118+'px '+W*.0714+'px',fontSize:fs+'px',lineHeight:cw+'px',letterSpacing:(cw-.6*fs)+'px'})}
+const usage=()=>{const g=geo(),mu=Math.ceil(menuBytes(ents.map(e=>e.label))/g.DB),T=totalSec(g),fr=cap()-files.reduce((a,f)=>a+(f.ex?0:Math.ceil(f.bytes.length/g.DB)),0)-mu;return[T-fr,T]};
+let pvp=0,pp;
+function pv(){const h=+$('#hue').value,t=+$('#tc').value;const iv=$('#inv').checked,bg=ac(h,iv?t*2:2);Object.assign($('#pv').style,{color:ac(h,iv?2:t*2),background:bg});(pp=menuPages($('#title').value,ents.map(e=>e.label),usage()),pvp=Math.min(pvp,pp.length-1),$('#pgr').hidden=pp.length<2,$('#pg').textContent=tr('Page '+(pvp+1)+' / '+pp.length),$('#pv').textContent=pp[pvp].join('\n'));fit()}
+$('#ents').addEventListener('input',e=>{const i=+e.target.dataset.i;if(e.target.tagName=='INPUT')ents[i].label=e.target.value;else ents[i].file=files[+e.target.value];pv()});
+$('#ents').addEventListener('click',e=>{const d=e.target.dataset,sw=(i,j)=>{if(j>=0&&j<ents.length){[ents[i],ents[j]]=[ents[j],ents[i]];$('#ord').value='m'}};
+ if(d.rm!=null)ents.splice(+d.rm,1);else if(d.up!=null)sw(+d.up,+d.up-1);else if(d.dn!=null)sw(+d.dn,+d.dn+1);else return;r2()});
+$('#ae').onclick=()=>{if(ents.length>=MAXE)return say('Max '+MAXE+' entries.');const f=files[0];ents.push({label:f.name.replace(/\..*/,''),file:f});sortEnts();r2()};
+$('#pp').onclick=()=>{pvp=Math.max(0,pvp-1);pv()};$('#pn').onclick=()=>{pvp++;pv()};$('#title').oninput=$('#hue').oninput=$('#tc').oninput=$('#inv').onchange=pv;
+$('#plain').onclick=()=>{try{const atr=buildPlainATR(files);dl(base?base.name.replace(/\\.atr$/i,'')+'_without_menu.atr':'files.atr',atr);say('Exported ATR without menu – '+files.length+' files included'+($('#dos').value&&!base?' + '+DOSDATA[$('#dos').value].t:'')+'.')}catch(e){say(''+e)}};
+$('#mk').onclick=()=>{try{const r=buildATR(files,ents,$('#title').value,+$('#hue').value,+$('#tc').value,$('#inv').checked);dl(base?base.name.replace(/\.atr$/i,'')+'_menu.atr':'menudisk.atr',r.atr);say('Built disk image – '+r.free+' free sectors. Boot it in Altirra or on a drive.')}catch(e){say(''+e)}};
+const sortEnts=()=>{const m=$('#ord').value;if(m=='m')return;const c=(a,b)=>a.label.localeCompare(b.label,undefined,{numeric:true,sensitivity:'base'});ents.sort((a,b)=>m=='z'?c(b,a):c(a,b))};
+$('#ord').onchange=()=>{sortEnts();r2()};
+$('#ents').addEventListener('change',e=>{if(e.target.tagName=='INPUT'&&$('#ord').value!='m'){sortEnts();r2()}});
+
+addEventListener('resize',fit);
+$('#lang').onclick=()=>{LANG=LANG=='es'?'en':'es';try{localStorage.setItem('atrmenu_lang',LANG)}catch(e){}applyLang()};
+try{if(localStorage.getItem('atrmenu_lang')=='es')LANG='es'}catch(e){}
+applyLang();
+</script></body></html>
