@@ -1,4 +1,4 @@
-# ATRmenu – BF loader
+# BF loader
 
 A single-file, 100% offline web tool that builds Atari 8-bit `.ATR` disk images with a bootable, selectable menu. Open `atrmenu.html` in any modern browser. There is nothing to install and nothing is uploaded.
 
