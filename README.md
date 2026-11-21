@@ -20,6 +20,7 @@ A single-file, 100% offline web tool that builds Atari 8-bit `.ATR` disk images 
 
 **Interface**
 - English (default) and Spanish, switchable from the top-right button.
+- Also three different themes for the UI, dark, light or 8bit. Notice that the 8bit theme resembles the Atari 8bit boot screen look and it even has an idle color screensaver that activates after 30 seconds without moving the pointer.
 
 ## Notes
 - The menu replaces the DOS boot sector. Programs are loaded with a built-in Atari binary-load routine, so they should be standard XEX/binary-load files.
